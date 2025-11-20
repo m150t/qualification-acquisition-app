@@ -6,13 +6,6 @@ import { Card } from './ui/card';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { ChevronLeft, Sparkles, Calendar, Check, Edit2 } from 'lucide-react';
-import { useStudy } from '@/src/store/useStudy';
-import { buildPlan } from '@/src/lib/bulidPlan';
-
-interface GoalSettingProps {
-  onComplete: () => void;
-  isEdit?: boolean;
-}
 
 const certifications = [
   'AWS認定ソリューションアーキテクト - アソシエイト',
@@ -34,70 +27,51 @@ const aiGeneratedPlan = [
   { week: 8, theme: '総復習と模擬試験', topics: ['重要ポイント確認', '模擬試験', '弱点強化'] },
 ];
 
-export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingProps) {
+export default function GoalSetting() {
   const [step, setStep] = useState(1);
-  const [selectedCert, setSelectedCert] = useState(
-    'AWS認定ソリューションアーキテクト - アソシエイト',
-  );
+  const [selectedCert, setSelectedCert] = useState('AWS認定ソリューションアーキテクト - アソシエイト');
   const [examDate, setExamDate] = useState('2025-03-15');
   const [showPlan, setShowPlan] = useState(false);
   const [editingWeek, setEditingWeek] = useState<number | null>(null);
-  const { setGoal, setPlan } = useStudy();
-
-  const onGenerate = () => {
-    if (!examDate) return;
-    setGoal({ cert: 'aws-saa', examDate });
-    setPlan(buildPlan(examDate));
-  };
 
   const handleGeneratePlan = () => {
-    onGenerate();
     setShowPlan(true);
   };
 
   const handleSavePlan = () => {
-    onComplete();
+    // ここは後で「ホームに戻る」など実装してもOK
+    alert('この計画で学習を始めます！（後でちゃんと処理を書く）');
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="flex items-center h-14 px-4">
-          {isEdit && (
-            <button onClick={onComplete} className="mr-3">
-              <ChevronLeft className="w-6 h-6 text-gray-700" />
-            </button>
-          )}
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+        <div className="flex h-14 items-center px-4">
+          {/* 戻るボタンは後で必要なら実装（今はダミー） */}
+          <button
+            onClick={() => history.back()}
+            className="mr-3"
+          >
+            <ChevronLeft className="h-6 w-6 text-gray-700" />
+          </button>
           <h1 className="text-gray-900">目標設定</h1>
         </div>
       </header>
 
-      <div className="p-4 space-y-4">
+      <div className="space-y-4 p-4">
         {/* Step Indicator */}
         {!showPlan && (
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {step > 1 ? <Check className="w-5 h-5" /> : '1'}
+          <div className="mb-6 flex items-center justify-center gap-2">
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+              {step > 1 ? <Check className="h-5 w-5" /> : '1'}
             </div>
-            <div className={`w-12 h-0.5 ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`} />
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {step > 2 ? <Check className="w-5 h-5" /> : '2'}
+            <div className={`h-0.5 w-12 ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`} />
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+              {step > 2 ? <Check className="h-5 w-5" /> : '2'}
             </div>
-            <div className={`w-12 h-0.5 ${step >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`} />
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
-              }`}
-            >
+            <div className={`h-0.5 w-12 ${step >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`} />
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
               3
             </div>
           </div>
@@ -107,10 +81,8 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
         {step === 1 && !showPlan && (
           <div className="space-y-4">
             <div>
-              <h2 className="text-gray-900 mb-2">取得したい資格を選択してください</h2>
-              <p className="text-sm text-gray-600">
-                AIがあなたに最適な学習計画を作成します
-              </p>
+              <h2 className="mb-2 text-gray-900">取得したい資格を選択してください</h2>
+              <p className="text-sm text-gray-600">AIがあなたに最適な学習計画を作成します</p>
             </div>
 
             <div className="space-y-2">
@@ -118,7 +90,7 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
                 <button
                   key={cert}
                   onClick={() => setSelectedCert(cert)}
-                  className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                  className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
                     selectedCert === cert
                       ? 'border-blue-600 bg-blue-50'
                       : 'border-gray-200 bg-white'
@@ -127,8 +99,8 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
                   <div className="flex items-center justify-between">
                     <span className="text-gray-900">{cert}</span>
                     {selectedCert === cert && (
-                      <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
-                        <Check className="w-3 h-3 text-white" />
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600">
+                        <Check className="h-3 w-3 text-white" />
                       </div>
                     )}
                   </div>
@@ -138,7 +110,7 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
 
             <Button
               onClick={() => setStep(2)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
+              className="h-12 w-full bg-blue-600 text-white hover:bg-blue-700"
             >
               次へ
             </Button>
@@ -149,7 +121,7 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
         {step === 2 && !showPlan && (
           <div className="space-y-4">
             <div>
-              <h2 className="text-gray-900 mb-2">試験日を設定してください</h2>
+              <h2 className="mb-2 text-gray-900">試験日を設定してください</h2>
               <p className="text-sm text-gray-600">目標日から遡って学習計画を立てます</p>
             </div>
 
@@ -157,33 +129,33 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="cert-name">取得したい資格</Label>
-                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                  <div className="mt-2 rounded-lg bg-gray-50 p-3">
                     <p className="text-gray-900">{selectedCert}</p>
                   </div>
                 </div>
 
                 <div>
                   <Label htmlFor="exam-date">試験日</Label>
-                  <div className="mt-2 relative">
+                  <div className="relative mt-2">
                     <input
                       id="exam-date"
                       type="date"
                       value={examDate}
                       onChange={(e) => setExamDate(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg pr-10"
+                      className="w-full rounded-lg border border-gray-300 p-3 pr-10"
                     />
-                    <Calendar className="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Calendar className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                   </div>
                 </div>
 
-                <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="rounded-lg bg-blue-50 p-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Sparkles className="w-4 h-4 text-white" />
+                    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600">
+                      <Sparkles className="h-4 w-4 text-white" />
                     </div>
                     <div>
                       <p className="text-sm text-gray-900">試験まであと127日</p>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="mt-1 text-sm text-gray-600">
                         週15時間の学習で合格レベルに到達できます
                       </p>
                     </div>
@@ -196,13 +168,13 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
               <Button
                 onClick={() => setStep(1)}
                 variant="outline"
-                className="flex-1 h-12"
+                className="h-12 flex-1"
               >
                 戻る
               </Button>
               <Button
                 onClick={() => setStep(3)}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-12"
+                className="h-12 flex-1 bg-blue-600 text-white hover:bg-blue-700"
               >
                 次へ
               </Button>
@@ -214,23 +186,21 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
         {step === 3 && !showPlan && (
           <div className="space-y-4">
             <div>
-              <h2 className="text-gray-900 mb-2">AI学習計画を生成します</h2>
-              <p className="text-sm text-gray-600">
-                あなたに最適な学習スケジュールを作成します
-              </p>
+              <h2 className="mb-2 text-gray-900">AI学習計画を生成します</h2>
+              <p className="text-sm text-gray-600">あなたに最適な学習スケジュールを作成します</p>
             </div>
 
             <Card className="p-4">
               <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">取得したい資格</span>
                   <span className="text-sm text-gray-900">{selectedCert}</span>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">試験日</span>
                   <span className="text-sm text-gray-900">{examDate}</span>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">学習期間</span>
                   <span className="text-sm text-gray-900">8週間</span>
                 </div>
@@ -241,10 +211,10 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
               </div>
             </Card>
 
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-lg">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+            <div className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600">
+                  <Sparkles className="h-5 w-5 text-white" />
                 </div>
                 <div>
                   <p className="text-gray-900">AI学習アシスタント</p>
@@ -260,15 +230,15 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
               <Button
                 onClick={() => setStep(2)}
                 variant="outline"
-                className="flex-1 h-12"
+                className="h-12 flex-1"
               >
                 戻る
               </Button>
               <Button
                 onClick={handleGeneratePlan}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-12"
+                className="h-12 flex-1 bg-blue-600 text-white hover:bg-blue-700"
               >
-                <Sparkles className="w-4 h-4 mr-2" />
+                <Sparkles className="mr-2 h-4 w-4" />
                 計画を生成します
               </Button>
             </div>
@@ -278,9 +248,9 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
         {/* AI Generated Plan */}
         {showPlan && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 rounded-lg text-white">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-5 h-5" />
+            <div className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white">
+              <div className="mb-2 flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
                 <h2>AI学習計画が完成しました</h2>
               </div>
               <p className="text-sm text-blue-100">
@@ -291,24 +261,14 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
             <div className="space-y-3">
               {aiGeneratedPlan.map((week) => (
                 <Card key={week.week} className="p-4">
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="mb-3 flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="mb-1 flex items-center gap-2">
                         <span className="text-sm text-gray-600">Week {week.week}</span>
-                        <div className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                        <div className="h-1.5 w-1.5 rounded-full bg-gray-300" />
                         <span className="text-sm text-gray-600">
-                          {new Date(
-                            2025,
-                            10,
-                            8 + (week.week - 1) * 7,
-                          ).getMonth() + 1}
-                          月
-                          {new Date(
-                            2025,
-                            10,
-                            8 + (week.week - 1) * 7,
-                          ).getDate()}
-                          日頃
+                          {/* 日付表示は仮 */}
+                          今週のテーマ
                         </span>
                       </div>
                       <h3 className="text-gray-900">{week.theme}</h3>
@@ -317,9 +277,9 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
                       onClick={() =>
                         setEditingWeek(editingWeek === week.week ? null : week.week)
                       }
-                      className="text-blue-600 p-1"
+                      className="p-1 text-blue-600"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="h-4 w-4" />
                     </button>
                   </div>
 
@@ -329,7 +289,7 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
                       <input
                         type="text"
                         defaultValue={week.theme}
-                        className="w-full p-2 border border-gray-300 rounded-lg"
+                        className="w-full rounded-lg border border-gray-300 p-2"
                       />
                       <Label>学習内容</Label>
                       <Textarea
@@ -340,7 +300,7 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
                       <Button
                         onClick={() => setEditingWeek(null)}
                         size="sm"
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        className="w-full bg-blue-600 text-white hover:bg-blue-700"
                       >
                         保存する
                       </Button>
@@ -348,11 +308,8 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
                   ) : (
                     <ul className="space-y-1">
                       {week.topics.map((topic, idx) => (
-                        <li
-                          key={idx}
-                          className="flex items-start gap-2 text-sm text-gray-700"
-                        >
-                          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5 flex-shrink-0" />
+                        <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                          <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-600" />
                           <span>{topic}</span>
                         </li>
                       ))}
@@ -364,7 +321,7 @@ export default function GoalSetting({ onComplete, isEdit = false }: GoalSettingP
 
             <Button
               onClick={handleSavePlan}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
+              className="h-12 w-full bg-blue-600 text-white hover:bg-blue-700"
             >
               この計画で学習を始めます
             </Button>

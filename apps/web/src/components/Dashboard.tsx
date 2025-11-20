@@ -14,10 +14,7 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react';
-
-type DashboardProps = {
-  onNavigate?: (page: string) => void;
-};
+import { useRouter } from 'next/navigation';
 
 const todayTasks = [
   {
@@ -53,10 +50,11 @@ const weekProgress = [
   { day: '日', completed: false },
 ];
 
-export default function Dashboard({ onNavigate }: DashboardProps) {
+export default function Dashboard() {
   const [tasks, setTasks] = useState(todayTasks);
   const completedTasks = tasks.filter((t) => t.completed).length;
   const totalProgress = 15; // 15% overall progress
+  const router = useRouter();
 
   const toggleTask = (id: number) => {
     setTasks((prev) =>
@@ -210,7 +208,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </div>
           <Button
-            onClick={() => onNavigate?.('report')}
+            onClick={() => router.push('report')}
             className="w-full bg-blue-600 text-white hover:bg-blue-700"
           >
             日報を書く
@@ -265,28 +263,28 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <div className="mx-auto flex h-14 max-w-md items-center justify-around text-xs">
           <button
             className="flex flex-col items-center text-blue-600"
-            onClick={() => onNavigate?.('home')}
+            onClick={() => router.push('home')}
           >
             <span>ホーム</span>
           </button>
 
           <button
             className="flex flex-col items-center text-gray-600"
-            onClick={() => onNavigate?.('calendar')}
+            onClick={() => router.push('calendar')}
           >
             <span>カレンダー</span>
           </button>
 
           <button
             className="flex flex-col items-center text-gray-600"
-            onClick={() => onNavigate?.('report')}
+            onClick={() => router.push('report')}
           >
             <span>日報</span>
           </button>
 
           <button
             className="flex flex-col items-center text-gray-600"
-            onClick={() => onNavigate?.('goal')}
+            onClick={() => router.push('goal')}
           >
             <span>目標</span>
           </button>

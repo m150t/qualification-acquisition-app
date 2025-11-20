@@ -9,7 +9,7 @@ export default function Page() {
   const handleNavigate = (key: string) => {
     switch (key) {
       case 'report':
-        router.push('/daily');
+        router.push('/report');
         break;
       case 'goal':
         router.push('/goal');
@@ -24,5 +24,5 @@ export default function Page() {
     }
   };
 
-  return <Dashboard onNavigate={handleNavigate} />;
+  return <Dashboard />;
 }

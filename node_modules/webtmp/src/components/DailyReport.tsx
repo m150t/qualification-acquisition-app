@@ -5,10 +5,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { ChevronLeft, Sparkles, Send, ThumbsUp, TrendingUp, BookOpen, Clock } from 'lucide-react';
-
-interface DailyReportProps {
-  onBack: () => void;
-}
+import { useRouter } from 'next/navigation';
 
 const previousReports = [
   {
@@ -37,12 +34,13 @@ const previousReports = [
   },
 ];
 
-export default function DailyReport({ onBack }: DailyReportProps) {
+export default function DailyReport() {
   const [log, setLog] = useState('');
   const [reportText, setReportText] = useState('');
   const [studyTime, setStudyTime] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
+  const router = useRouter();
 
   const handleSubmit = () => {
     // Simulate AI response
@@ -57,7 +55,7 @@ export default function DailyReport({ onBack }: DailyReportProps) {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="flex items-center h-14 px-4">
-          <button onClick={onBack} className="mr-3">
+          <button onClick={() => router.push('/')} className="mr-3">
             <ChevronLeft className="w-6 h-6 text-gray-700" />
           </button>
           <h1 className="text-gray-900">学習日報</h1>
@@ -166,7 +164,7 @@ export default function DailyReport({ onBack }: DailyReportProps) {
             </Card>
 
             <Button
-              onClick={onBack}
+              onClick={() => router.push('/')}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
             >
               ダッシュボードに戻る

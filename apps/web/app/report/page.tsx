@@ -6,10 +6,6 @@ export default function Page() {
   const router = useRouter();
 
   return (
-    <DailyReport
-      onBack={() => {
-        router.push('/');
-      }}
-    />
+    <DailyReport />
   );
 }

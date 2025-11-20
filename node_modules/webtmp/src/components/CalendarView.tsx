@@ -4,10 +4,7 @@ import { useState } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-interface CalendarViewProps {
-  onBack: () => void;
-}
+import { useRouter } from 'next/navigation';
 
 const weekDays = ['月', '火', '水', '木', '金', '土', '日'];
 const monthDays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -28,9 +25,10 @@ const studyData: Record<string, { planned: boolean; completed: boolean; hours?: 
   '2025-11-14': { planned: true, completed: false },
 };
 
-export default function CalendarView({ onBack }: CalendarViewProps) {
+export default function CalendarView() {
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(new Date(2025, 10, 8)); // Nov 8, 2025
+  const router = useRouter();
 
   const getWeekDates = () => {
     const dates = [];
@@ -89,7 +87,7 @@ export default function CalendarView({ onBack }: CalendarViewProps) {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center">
-            <button onClick={onBack} className="mr-3">
+            <button onClick={() => router.push('/')} className="mr-3">
               <ChevronLeft className="w-6 h-6 text-gray-700" />
             </button>
             <h1 className="text-gray-900">学習カレンダー</h1>

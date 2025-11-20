@@ -6,12 +6,7 @@ export default function Page() {
   const router = useRouter();
 
   return (
-    <GoalSetting
-      isEdit
-      onComplete={() => {
-        router.push('/');
-      }}
-    />
+    <GoalSetting />
   );
 }
 
