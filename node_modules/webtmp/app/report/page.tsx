@@ -1,11 +1,10 @@
+// apps/web/app/daily/page.tsx
 'use client';
-import { useRouter } from 'next/navigation';
-import DailyReport from '@/src/components/DailyReport';
 
-export default function Page() {
-  const router = useRouter();
+import { DailyReport } from '@/src/components/DailyReport';
 
+export default function DailyPage() {
   return (
-    <DailyReport />
+    <DailyReport onBack={() => history.back()} />
   );
 }
