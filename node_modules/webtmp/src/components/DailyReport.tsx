@@ -76,6 +76,34 @@ export function DailyReport({ onBack }: DailyReportProps) {
       }
 
       console.log('report save success:', text);
+          // ======== ここから localStorage 保存部分 ========
+      if (typeof window !== 'undefined') {
+        try {
+          const key = 'studyReports';
+          const existing = window.localStorage.getItem(key);
+          let reports: any[] = [];
+
+          if (existing) {
+            reports = JSON.parse(existing);
+            if (!Array.isArray(reports)) {
+              reports = [];
+            }
+          }
+
+          reports.push({
+            date: payload.date,
+            studyTime: payload.studyTime === '' ? null : Number(payload.studyTime),
+            tasksCompleted: payload.tasksCompleted,
+            content: payload.content,
+            savedAt: new Date().toISOString(),
+          });
+
+          window.localStorage.setItem(key, JSON.stringify(reports));
+          console.log('localStorage saved:', reports);
+        } catch (e) {
+          console.error('localStorage save error', e);
+        }
+      }
       setLastSavedMessage('日報を保存しました（今はダミーAPIですがフローはOK）');
 
       // 保存後、内容だけサクッと残したいならここでクリアするかどうか決める

@@ -40,6 +40,8 @@ const CERT_MASTER = [
   },
 ] as const;
 
+type CertCode = (typeof CERT_MASTER)[number]['code'];
+
 type WeeklyPlan = {
   week: number;
   theme: string;
@@ -47,14 +49,46 @@ type WeeklyPlan = {
 };
 
 const DEFAULT_PLAN: WeeklyPlan[] = [
-  { week: 1, theme: 'AWSの基礎とIAM', topics: ['アカウント設定', 'IAMユーザー・ロール', 'セキュリティベストプラクティス'] },
-  { week: 2, theme: 'EC2とストレージ', topics: ['EC2インスタンス', 'EBS・EFS', 'S3基礎'] },
-  { week: 3, theme: 'ネットワーキング基礎', topics: ['VPC', 'サブネット', 'ルートテーブル'] },
-  { week: 4, theme: '監視と運用', topics: ['CloudWatch', 'CloudTrail', '基本的な運用設計'] },
-  { week: 5, theme: 'データベース', topics: ['RDS', 'DynamoDB', 'ElastiCache'] },
-  { week: 6, theme: '高可用性とスケーラビリティ', topics: ['マルチAZ', 'スケーリング戦略', 'フェイルオーバー'] },
-  { week: 7, theme: 'セキュリティと暗号化', topics: ['KMS', 'セキュリティグループ', 'NACL'] },
-  { week: 8, theme: '総復習と模擬試験', topics: ['重要ポイント確認', '模擬試験', '弱点の洗い出し'] },
+  {
+    week: 1,
+    theme: 'AWSの基礎とIAM',
+    topics: ['アカウント設定', 'IAMユーザー・ロール', 'セキュリティベストプラクティス'],
+  },
+  {
+    week: 2,
+    theme: 'EC2とストレージ',
+    topics: ['EC2インスタンス', 'EBS・EFS', 'S3基礎'],
+  },
+  {
+    week: 3,
+    theme: 'ネットワーキング基礎',
+    topics: ['VPC', 'サブネット', 'ルートテーブル'],
+  },
+  {
+    week: 4,
+    theme: '監視と運用',
+    topics: ['CloudWatch', 'CloudTrail', '基本的な運用設計'],
+  },
+  {
+    week: 5,
+    theme: 'データベース',
+    topics: ['RDS', 'DynamoDB', 'ElastiCache'],
+  },
+  {
+    week: 6,
+    theme: '高可用性とスケーラビリティ',
+    topics: ['マルチAZ', 'スケーリング戦略', 'フェイルオーバー'],
+  },
+  {
+    week: 7,
+    theme: 'セキュリティと暗号化',
+    topics: ['KMS', 'セキュリティグループ', 'NACL'],
+  },
+  {
+    week: 8,
+    theme: '総復習と模擬試験',
+    topics: ['重要ポイント確認', '模擬試験', '弱点の洗い出し'],
+  },
 ];
 
 export default function GoalSetting() {
@@ -62,7 +96,7 @@ export default function GoalSetting() {
   const [step, setStep] = useState(1);
 
   // 資格関連
-  const [selectedCertCode, setSelectedCertCode] = useState<'aws-saa' | 'ap' | 'gcp-pa' | 'az-admin' | 'toeic-800' | 'other'>('aws-saa');
+  const [selectedCertCode, setSelectedCertCode] = useState<CertCode>('aws-saa');
   const [customCertName, setCustomCertName] = useState('');
 
   // 試験日
@@ -79,7 +113,14 @@ export default function GoalSetting() {
   const [editingWeek, setEditingWeek] = useState<number | null>(null);
   const [plan, setPlan] = useState<WeeklyPlan[]>(DEFAULT_PLAN);
 
-  const selectedCert = CERT_MASTER.find(c => c.code === selectedCertCode) ?? CERT_MASTER[0];
+  const selectedCert =
+    CERT_MASTER.find((c) => c.code === selectedCertCode) ?? CERT_MASTER[0];
+
+  // 画面表示用の資格名
+  const displayCertName =
+    selectedCertCode === 'other'
+      ? customCertName || '（資格名を入力してください）'
+      : selectedCert.label;
 
   // 試験日から週数を計算
   useEffect(() => {
@@ -104,58 +145,119 @@ export default function GoalSetting() {
     setShowPlan(true);
   };
 
-const handleSavePlan = async () => {
-  const payload = {
-    certCode: selectedCertCode,
-    certName: displayCertName,
-    examDate,
-    weeklyHours: weeklyHours === '' ? null : weeklyHours,
-    weeksUntilExam,
-    plan,
+  // 日付 -> 'YYYY-MM-DD'
+  const makeDateKey = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
 
-  try {
-    const res = await fetch('/api/goals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+  const handleSavePlan = async () => {
+    // 1) localStorage に Dashboard 用のデータを保存する
+    try {
+      if (typeof window !== 'undefined') {
+        // studyGoal
+        const goalForStorage = {
+          certName: displayCertName,
+          examDate,
+          weeklyHours: weeklyHours === '' ? null : weeklyHours,
+        };
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error('save error', err);
-      alert('目標の保存に失敗しました');
+        window.localStorage.setItem(
+          'studyGoal',
+          JSON.stringify(goalForStorage),
+        );
+
+        // studyPlan: 週ごとのテーマ＋トピックを
+        // 「今日から順番に1日1トピック」みたいな感じで日別タスクに展開する
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        type PlanItemForStorage = {
+          date: string; // 'YYYY-MM-DD'
+          title: string;
+          estimatedMinutes?: number;
+          weekLabel?: string;
+        };
+
+        const planForStorage: PlanItemForStorage[] = [];
+        let offset = 0;
+
+        plan.forEach((w) => {
+          w.topics.forEach((topic) => {
+            const d = new Date(today);
+            d.setDate(d.getDate() + offset);
+
+            planForStorage.push({
+              date: makeDateKey(d),
+              title: `${w.theme}：${topic}`,
+              estimatedMinutes: 30,
+              weekLabel: `Week ${w.week}`,
+            });
+
+            offset += 1;
+          });
+        });
+
+        window.localStorage.setItem(
+          'studyPlan',
+          JSON.stringify(planForStorage),
+        );
+      }
+    } catch (e) {
+      console.error('failed to save to localStorage', e);
+      alert('ローカル保存に失敗しました');
       return;
     }
 
-    alert('目標を保存しました！（DynamoDB に書き込み済み）');
-  } catch (e) {
-    console.error(e);
-    alert('通信エラーで保存に失敗しました');
-  }
-};
+    // 2) API にも投げておく（今はダミーで 200 を返している想定）
+    const payload = {
+      certCode: selectedCertCode,
+      certName: displayCertName,
+      examDate,
+      weeklyHours: weeklyHours === '' ? null : weeklyHours,
+      weeksUntilExam,
+      plan,
+    };
+
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('save error', err);
+        alert('目標の保存に失敗しました（サーバ側）');
+        return;
+      }
+
+      alert('目標と学習計画を保存しました！\nホーム画面に反映されます。');
+    } catch (e) {
+      console.error(e);
+      alert('通信エラーで保存に失敗しました');
+    }
+  };
 
   const handleUpdateWeekTheme = (weekNumber: number, newTheme: string) => {
-    setPlan(prev =>
-      prev.map(w => (w.week === weekNumber ? { ...w, theme: newTheme } : w)),
+    setPlan((prev) =>
+      prev.map((w) => (w.week === weekNumber ? { ...w, theme: newTheme } : w)),
     );
   };
 
   const handleUpdateWeekTopics = (weekNumber: number, text: string) => {
     const topics = text
       .split('\n')
-      .map(t => t.trim())
+      .map((t) => t.trim())
       .filter(Boolean);
 
-    setPlan(prev =>
-      prev.map(w => (w.week === weekNumber ? { ...w, topics } : w)),
+    setPlan((prev) =>
+      prev.map((w) => (w.week === weekNumber ? { ...w, topics } : w)),
     );
   };
-
-  const displayCertName =
-    selectedCertCode === 'other'
-      ? customCertName || '（資格名を入力してください）'
-      : selectedCert.label;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -180,7 +282,11 @@ const handleSavePlan = async () => {
             >
               {step > 1 ? <Check className="h-5 w-5" /> : '1'}
             </div>
-            <div className={`h-0.5 w-12 ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`} />
+            <div
+              className={`h-0.5 w-12 ${
+                step >= 2 ? 'bg-blue-600' : 'bg-gray-200'
+              }`}
+            />
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full ${
                 step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
@@ -188,7 +294,11 @@ const handleSavePlan = async () => {
             >
               {step > 2 ? <Check className="h-5 w-5" /> : '2'}
             </div>
-            <div className={`h-0.5 w-12 ${step >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`} />
+            <div
+              className={`h-0.5 w-12 ${
+                step >= 3 ? 'bg-blue-600' : 'bg-gray-200'
+              }`}
+            />
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full ${
                 step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
@@ -215,8 +325,8 @@ const handleSavePlan = async () => {
                 id="cert-select"
                 value={selectedCertCode}
                 onChange={(e) => {
-                  const code = e.target.value as typeof selectedCertCode;
-                  const cert = CERT_MASTER.find(c => c.code === code);
+                  const code = e.target.value as CertCode;
+                  const cert = CERT_MASTER.find((c) => c.code === code);
                   setSelectedCertCode(code);
                   if (cert?.recommendedWeeklyHours != null) {
                     setWeeklyHours(cert.recommendedWeeklyHours);
@@ -226,7 +336,7 @@ const handleSavePlan = async () => {
                 }}
                 className="w-full rounded-lg border border-gray-300 p-3"
               >
-                {CERT_MASTER.map(cert => (
+                {CERT_MASTER.map((cert) => (
                   <option key={cert.code} value={cert.code}>
                     {cert.label}
                   </option>
@@ -295,7 +405,9 @@ const handleSavePlan = async () => {
                     <Label>学習期間</Label>
                     <div className="mt-2 rounded-lg bg-gray-50 p-3">
                       <p className="text-gray-900">
-                        {weeksUntilExam != null ? `${weeksUntilExam}週間` : '―'}
+                        {weeksUntilExam != null
+                          ? `${weeksUntilExam}週間`
+                          : '―'}
                       </p>
                     </div>
                   </div>
@@ -307,7 +419,9 @@ const handleSavePlan = async () => {
                       type="number"
                       value={weeklyHours}
                       onChange={(e) =>
-                        setWeeklyHours(e.target.value === '' ? '' : Number(e.target.value))
+                        setWeeklyHours(
+                          e.target.value === '' ? '' : Number(e.target.value),
+                        )
                       }
                       className="mt-2 w-full rounded-lg border border-gray-300 p-3"
                       placeholder="例）10"
@@ -323,7 +437,9 @@ const handleSavePlan = async () => {
                     <div>
                       <p className="text-sm text-gray-900">
                         試験まであと
-                        {weeksUntilExam != null ? `約 ${weeksUntilExam}週間` : '―'}
+                        {weeksUntilExam != null
+                          ? `約 ${weeksUntilExam}週間`
+                          : '―'}
                       </p>
                       <p className="mt-1 text-sm text-gray-600">
                         週あたりの学習時間は、生活リズムに合わせて現実的な値に調整してください。
@@ -352,13 +468,13 @@ const handleSavePlan = async () => {
           </div>
         )}
 
-        {/* STEP 3: 計画の確認（今は手動＋ダミー） */}
+        {/* STEP 3: 計画の確認 */}
         {step === 3 && !showPlan && (
           <div className="space-y-4">
             <div>
               <h2 className="mb-2 text-gray-900">学習計画の確認</h2>
               <p className="text-sm text-gray-600">
-                現時点では、固定のテンプレート計画をベースにしています。後でAI生成に差し替える。
+                現時点では、固定のテンプレート計画をベースにしています。後でAI生成に差し替える予定です。
               </p>
             </div>
 
@@ -366,7 +482,9 @@ const handleSavePlan = async () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">資格</span>
-                  <span className="text-sm text-gray-900">{displayCertName}</span>
+                  <span className="text-sm text-gray-900">
+                    {displayCertName}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">試験日</span>
@@ -379,7 +497,9 @@ const handleSavePlan = async () => {
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600">推奨学習時間（週）</span>
+                  <span className="text-sm text-gray-600">
+                    推奨学習時間（週）
+                  </span>
                   <span className="text-sm text-gray-900">
                     {weeklyHours !== '' ? `${weeklyHours}時間` : '未設定'}
                   </span>
@@ -395,7 +515,7 @@ const handleSavePlan = async () => {
                 <div>
                   <p className="text-gray-900">学習アシスタント</p>
                   <p className="text-sm text-gray-600">
-                    今はテンプレ計画ですが、あとでAIで自動生成に変える予定。
+                    今はテンプレ計画ですが、あとでAIで自動生成に変える予定です。
                   </p>
                 </div>
               </div>
@@ -422,7 +542,7 @@ const handleSavePlan = async () => {
           </div>
         )}
 
-        {/* 計画リスト表示（AIの代わりにテンプレ＋編集可） */}
+        {/* 計画リスト表示（テンプレ＋編集可） */}
         {showPlan && (
           <div className="space-y-4">
             <div className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white">
@@ -431,7 +551,8 @@ const handleSavePlan = async () => {
                 <h2>学習計画</h2>
               </div>
               <p className="text-sm text-blue-100">
-                週ごとのテーマと学習内容を編集できます。後でこの内容を DynamoDB に保存する。
+                週ごとのテーマと学習内容を編集できます。後でこの内容を DynamoDB
+                に保存します。
               </p>
             </div>
 
@@ -447,7 +568,9 @@ const handleSavePlan = async () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span>学習期間</span>
-                  <span>{weeksUntilExam != null ? `${weeksUntilExam}週間` : '―'}</span>
+                  <span>
+                    {weeksUntilExam != null ? `${weeksUntilExam}週間` : '―'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>推奨学習時間（週）</span>
@@ -464,13 +587,17 @@ const handleSavePlan = async () => {
                   <div className="mb-3 flex items-start justify-between">
                     <div className="flex-1">
                       <div className="mb-1 flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Week {week.week}</span>
+                        <span className="text-sm text-gray-600">
+                          Week {week.week}
+                        </span>
                       </div>
                       <h3 className="text-gray-900">{week.theme}</h3>
                     </div>
                     <button
                       onClick={() =>
-                        setEditingWeek(editingWeek === week.week ? null : week.week)
+                        setEditingWeek(
+                          editingWeek === week.week ? null : week.week,
+                        )
                       }
                       className="p-1 text-blue-600"
                       type="button"
