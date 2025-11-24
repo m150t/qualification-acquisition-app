@@ -1,3 +1,4 @@
+// src/components/Dashboard.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -21,11 +22,10 @@ type StudyGoal = {
   weeklyHours: number | null;
 };
 
-type PlanItem = {
-  date: string; // 'YYYY-MM-DD'
-  title: string;
-  estimatedMinutes?: number;
-  weekLabel?: string;
+type DayPlan = {
+  date: string;      // 'YYYY-MM-DD'
+  theme: string;
+  topics: string[];
 };
 
 type Report = {
@@ -33,7 +33,8 @@ type Report = {
   studyTime: number | null;
   tasksCompleted: number | null;
   content: string;
-  savedAt: string; // ISO文字列
+  aiComment?: string;
+  savedAt: string;
 };
 
 type UiTask = {
@@ -65,53 +66,70 @@ export default function Dashboard() {
   }, []);
   const todayKey = useMemo(() => makeDateKey(todayDate), [todayDate]);
 
-  // ローカルストレージから読み込み
+  // -----------------------------
+  // API から goal / plan / reports を読む
+  // -----------------------------
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const fetchAll = async () => {
+      // 1. 目標＋計画
+      try {
+        const goalRes = await fetch('/api/goals');
+        if (goalRes.ok) {
+          const data = await goalRes.json();
+          // 期待する形：
+          // { goal: { certName, examDate, weeklyHours }, plan: DayPlan[] }
+          if (data.goal) {
+            setGoal({
+              certName: data.goal.certName,
+              examDate: data.goal.examDate,
+              weeklyHours: data.goal.weeklyHours ?? null,
+            });
+          }
 
-    // 目標
-    try {
-      const rawGoal = window.localStorage.getItem('studyGoal');
-      if (rawGoal) {
-        const g = JSON.parse(rawGoal) as StudyGoal;
-        setGoal(g);
-      }
-    } catch (e) {
-      console.error('failed to load studyGoal', e);
-    }
+          if (Array.isArray(data.plan)) {
+            // 今日の日付の DayPlan を探して tasks に変換
+            const todayPlan: DayPlan | undefined = data.plan.find(
+              (p: DayPlan) => p.date === todayKey,
+            );
 
-    // 今日のタスク
-    try {
-      const rawPlan = window.localStorage.getItem('studyPlan');
-      if (rawPlan) {
-        const plan = JSON.parse(rawPlan) as PlanItem[];
-        const todays = plan.filter((p) => p.date === todayKey);
-        const uiTasks: UiTask[] = todays.map((p, idx) => ({
-          id: idx + 1,
-          title: p.title,
-          duration: p.estimatedMinutes
-            ? `${p.estimatedMinutes}分`
-            : '30分',
-          category: p.weekLabel,
-        }));
-        setTasks(uiTasks);
-      }
-    } catch (e) {
-      console.error('failed to load studyPlan', e);
-    }
-
-    // 日報
-    try {
-      const rawReports = window.localStorage.getItem('studyReports');
-      if (rawReports) {
-        const list = JSON.parse(rawReports) as Report[];
-        if (Array.isArray(list)) {
-          setReports(list);
+            if (todayPlan) {
+              const uiTasks: UiTask[] = (todayPlan.topics ?? []).map(
+                (t: string, idx: number) => ({
+                  id: idx + 1,
+                  title: t,
+                  duration: '30分', // ひとまず固定表示
+                  category: todayPlan.theme,
+                }),
+              );
+              setTasks(uiTasks);
+            } else {
+              setTasks([]);
+            }
+          }
+        } else {
+          console.error('failed to load /api/goals', await goalRes.text());
         }
+      } catch (e) {
+        console.error('error fetching /api/goals', e);
       }
-    } catch (e) {
-      console.error('failed to load studyReports', e);
-    }
+
+      // 2. 日報一覧
+      try {
+        const repRes = await fetch('/api/reports');
+        if (repRes.ok) {
+          const data = await repRes.json();
+          if (Array.isArray(data.reports)) {
+            setReports(data.reports);
+          }
+        } else {
+          console.error('failed to load /api/reports', await repRes.text());
+        }
+      } catch (e) {
+        console.error('error fetching /api/reports', e);
+      }
+    };
+
+    fetchAll();
   }, [todayKey]);
 
   // 日付ごと「勉強したか」
@@ -181,7 +199,6 @@ export default function Dashboard() {
 
   // 今週の学習時間（時間）
   const weekStudyHours = useMemo(() => {
-    // 今週の月〜日
     const base = new Date(todayDate);
     const day = base.getDay(); // 0:日〜6:土
     const diff = (day === 0 ? -6 : 1) - day; // 月曜日に合わせる
@@ -225,7 +242,7 @@ export default function Dashboard() {
     );
   }, [goal, daysUntilExam, reports]);
 
-  // 時間帯に応じたあいさつ（ちゃんと現在時刻を見る）
+  // あいさつ（今の時刻で判定）
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 5) return '夜更かしさんですね';
@@ -254,32 +271,23 @@ export default function Dashboard() {
             <Card className="border-white/20 bg-white/10 p-4 backdrop-blur-sm">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-100">
-                    {goal.certName}
-                  </p>
+                  <p className="text-sm text-blue-100">{goal.certName}</p>
                   <div className="mt-1 flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-white" />
                     <p className="text-white">{goal.examDate}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl text-white">
-                    {daysUntilExam ?? '―'}
-                  </p>
+                  <p className="text-2xl text-white">{daysUntilExam ?? '―'}</p>
                   <p className="text-sm text-blue-100">日</p>
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-blue-100">学習進捗</span>
-                  <span className="text-white">
-                    {totalProgress}%
-                  </span>
+                  <span className="text-white">{totalProgress}%</span>
                 </div>
-                <Progress
-                  value={totalProgress}
-                  className="h-2 bg白/20"
-                />
+                <Progress value={totalProgress} className="h-2 bg-white/20" />
               </div>
             </Card>
           ) : (
@@ -318,9 +326,7 @@ export default function Dashboard() {
                 >
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-900">
-                        {task.title}
-                      </p>
+                      <p className="text-sm text-gray-900">{task.title}</p>
                       <div className="mt-1 flex items-center gap-3">
                         <span className="flex items-center gap-1 text-xs text-gray-500">
                           <Clock className="h-3 w-3" />
@@ -393,16 +399,14 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* 直近日報サマリ（将来AI差し替え予定） */}
+        {/* 直近日報サマリ */}
         <Card className="border-amber-200 bg-amber-50 p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div className="space-y-1">
-              <p className="mb-1 text-sm text-gray-900">
-                直近の日報サマリ
-              </p>
+              <p className="mb-1 text-sm text-gray-900">直近の日報サマリ</p>
 
               {latestReport ? (
                 <>
@@ -413,8 +417,6 @@ export default function Dashboard() {
                   </p>
                   <p className="mt-1 text-sm text-gray-700">
                     {latestReport.content || '（内容未入力）'}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
                   </p>
                 </>
               ) : (
@@ -437,21 +439,18 @@ export default function Dashboard() {
           >
             <span>ホーム</span>
           </button>
-
           <button
             className="flex flex-col items-center text-gray-600"
             onClick={() => router.push('/calendar')}
           >
             <span>カレンダー</span>
           </button>
-
           <button
             className="flex flex-col items-center text-gray-600"
             onClick={() => router.push('/report')}
           >
             <span>日報</span>
           </button>
-
           <button
             className="flex flex-col items-center text-gray-600"
             onClick={() => router.push('/goal')}

@@ -16,8 +16,8 @@ type StudyDayData = {
 
 type Report = {
   date: string;          // "YYYY-MM-DD"
-  studyTime: number|null;
-  tasksCompleted: number|null;
+  studyTime: number | null;
+  tasksCompleted: number | null;
   content: string;
   savedAt: string;
 };
@@ -31,84 +31,84 @@ export default function CalendarView() {
     totalHours: 0,
     achievementRate: 0,
   });
-  
-  // localStorage から日報を読み込み & 集計
+
+  // 🔁 /api/reports から日報を取得して集計
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const fetchReports = async () => {
+      try {
+        const res = await fetch('/api/reports');
+        if (!res.ok) {
+          console.error('failed to load /api/reports', await res.text());
+          setStudyData({});
+          setMonthlyStats({ daysCompleted: 0, totalHours: 0, achievementRate: 0 });
+          return;
+        }
 
-    try {
-      const raw = window.localStorage.getItem('studyReports');
-      if (!raw) {
+        const data = await res.json();
+        const reports: Report[] = Array.isArray(data.reports) ? data.reports : [];
+
+        const map: Record<string, StudyDayData> = {};
+
+        for (const r of reports) {
+          if (!r.date) continue;
+          const key = r.date;
+          const hours = typeof r.studyTime === 'number' ? r.studyTime : 0;
+
+          if (!map[key]) {
+            map[key] = {
+              planned: false, // いまは計画との連携は後回し
+              completed: hours > 0,
+              hours,
+            };
+          } else {
+            map[key].completed = map[key].completed || hours > 0;
+            map[key].hours = (map[key].hours || 0) + hours;
+          }
+        }
+
+        setStudyData(map);
+
+        // 今月の統計をざっくり計算
+        const now = currentDate;
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-based
+
+        let daysCompleted = 0;
+        let totalHours = 0;
+
+        Object.entries(map).forEach(([dateStr, data]) => {
+          const d = new Date(dateStr);
+          if (
+            d.getFullYear() === year &&
+            d.getMonth() === month &&
+            data.completed
+          ) {
+            daysCompleted += 1;
+            totalHours += data.hours || 0;
+          }
+        });
+
+        // 仮の「達成率」：今月の日報入力した日の割合（最大 100%）
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const achievementRate =
+          lastDay > 0
+            ? Math.min(100, Math.round((daysCompleted / lastDay) * 100))
+            : 0;
+
+        setMonthlyStats({
+          daysCompleted,
+          totalHours,
+          achievementRate,
+        });
+      } catch (e) {
+        console.error('failed to fetch /api/reports', e);
         setStudyData({});
         setMonthlyStats({ daysCompleted: 0, totalHours: 0, achievementRate: 0 });
-        return;
       }
+    };
 
-      const reports: Report[] = JSON.parse(raw);
-      if (!Array.isArray(reports)) {
-        setStudyData({});
-        setMonthlyStats({ daysCompleted: 0, totalHours: 0, achievementRate: 0 });
-        return;
-      }
-
-      const map: Record<string, StudyDayData> = {};
-
-      for (const r of reports) {
-        if (!r.date) continue;
-        const key = r.date;
-        const hours = typeof r.studyTime === 'number' ? r.studyTime : 0;
-
-        if (!map[key]) {
-          map[key] = {
-            planned: false,    // いまは計画との連携は後回し
-            completed: true,
-            hours,
-          };
-        } else {
-          map[key].completed = true;
-          map[key].hours = (map[key].hours || 0) + hours;
-        }
-      }
-
-      setStudyData(map);
-
-      // 今月の統計をざっくり計算
-      const now = currentDate;
-      const year = now.getFullYear();
-      const month = now.getMonth(); // 0-based
-
-      let daysCompleted = 0;
-      let totalHours = 0;
-
-      Object.entries(map).forEach(([dateStr, data]) => {
-        const d = new Date(dateStr);
-        if (
-          d.getFullYear() === year &&
-          d.getMonth() === month &&
-          data.completed
-        ) {
-          daysCompleted += 1;
-          totalHours += data.hours || 0;
-        }
-      });
-
-      // 仮の「達成率」：今月の日報入力した日の割合（最大 100%）
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      const achievementRate = lastDay > 0
-        ? Math.min(100, Math.round((daysCompleted / lastDay) * 100))
-        : 0;
-
-      setMonthlyStats({
-        daysCompleted,
-        totalHours,
-        achievementRate,
-      });
-    } catch (e) {
-      console.error('failed to load studyReports from localStorage', e);
-      setStudyData({});
-      setMonthlyStats({ daysCompleted: 0, totalHours: 0, achievementRate: 0 });
-    }
-  }, [currentDate]); // 月を変えたら統計も更新
+    fetchReports();
+  }, [currentDate]);
 
   const getWeekDates = () => {
     const dates: Date[] = [];
@@ -142,7 +142,6 @@ export default function CalendarView() {
   };
 
   const getDateKey = (date: Date) => {
-    // YYYY-MM-DD 形式に揃える
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
@@ -165,13 +164,12 @@ export default function CalendarView() {
   };
 
   return (
-      <div className="min-h-screen bg-gray-50 pb-4">
+    <div className="min-h-screen bg-gray-50 pb-4">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center">
             <button
-              // 👇 props じゃなくてブラウザ履歴に戻る
               onClick={() => history.back()}
               className="mr-3"
             >
@@ -188,14 +186,22 @@ export default function CalendarView() {
           <Button
             onClick={() => setViewMode('week')}
             variant={viewMode === 'week' ? 'default' : 'outline'}
-            className={viewMode === 'week' ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1' : 'flex-1'}
+            className={
+              viewMode === 'week'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1'
+                : 'flex-1'
+            }
           >
             週表示
           </Button>
           <Button
             onClick={() => setViewMode('month')}
             variant={viewMode === 'month' ? 'default' : 'outline'}
-            className={viewMode === 'month' ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1' : 'flex-1'}
+            className={
+              viewMode === 'month'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1'
+                : 'flex-1'
+            }
           >
             月表示
           </Button>
@@ -223,7 +229,8 @@ export default function CalendarView() {
                 <ChevronLeft className="w-5 h-5 text-gray-700" />
               </button>
               <h2 className="text-gray-900">
-                {weekDates[0].getMonth() + 1}月{weekDates[0].getDate()}日 〜 {weekDates[6].getMonth() + 1}月{weekDates[6].getDate()}日
+                {weekDates[0].getMonth() + 1}月{weekDates[0].getDate()}日 〜{' '}
+                {weekDates[6].getMonth() + 1}月{weekDates[6].getDate()}日
               </h2>
               <button onClick={() => navigateWeek('next')}>
                 <ChevronRight className="w-5 h-5 text-gray-700" />
@@ -234,28 +241,35 @@ export default function CalendarView() {
               {weekDates.map((date, idx) => {
                 const dateKey = getDateKey(date);
                 const data = studyData[dateKey];
-                const isToday = date.toDateString() === new Date().toDateString();
+                const isToday =
+                  date.toDateString() === new Date().toDateString();
 
                 return (
                   <div
                     key={idx}
                     className={`p-3 rounded-lg border-2 transition-all ${
-                      isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                      isToday
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="text-center">
-                          <p className="text-xs text-gray-600">{weekDays[idx]}</p>
-                          <p className={`text-gray-900 ${isToday ? 'text-blue-600' : ''}`}>
+                          <p className="text-xs text-gray-600">
+                            {weekDays[idx]}
+                          </p>
+                          <p
+                            className={`text-gray-900 ${
+                              isToday ? 'text-blue-600' : ''
+                            }`}
+                          >
                             {date.getDate()}
                           </p>
                         </div>
                         <div
                           className={`w-3 h-3 rounded-full ${
-                            data?.completed
-                              ? 'bg-blue-600'
-                              : 'bg-gray-200'
+                            data?.completed ? 'bg-blue-600' : 'bg-gray-200'
                           }`}
                         />
                         <p className="text-sm text-gray-700">
@@ -290,7 +304,10 @@ export default function CalendarView() {
             {/* Month Day Headers */}
             <div className="grid grid-cols-7 gap-1 mb-2">
               {monthDays.map((day, idx) => (
-                <div key={idx} className="text-center text-xs text-gray-600 py-1">
+                <div
+                  key={idx}
+                  className="text-center text-xs text-gray-600 py-1"
+                >
                   {day}
                 </div>
               ))}
@@ -301,8 +318,10 @@ export default function CalendarView() {
               {monthDates.map((date, idx) => {
                 const dateKey = getDateKey(date);
                 const data = studyData[dateKey];
-                const isToday = date.toDateString() === new Date().toDateString();
-                const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                const isToday =
+                  date.toDateString() === new Date().toDateString();
+                const isCurrentMonth =
+                  date.getMonth() === currentDate.getMonth();
 
                 return (
                   <div
@@ -331,7 +350,9 @@ export default function CalendarView() {
           <h3 className="text-gray-900 mb-3">今月の統計</h3>
           <div className="grid grid-cols-3 gap-3">
             <div className="text-center">
-              <p className="text-2xl text-blue-600">{monthlyStats.daysCompleted}</p>
+              <p className="text-2xl text-blue-600">
+                {monthlyStats.daysCompleted}
+              </p>
               <p className="text-xs text-gray-600 mt-1">学習日数</p>
             </div>
             <div className="text-center">

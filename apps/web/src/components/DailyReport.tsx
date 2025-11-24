@@ -1,3 +1,4 @@
+// apps/web/src/components/DailyReport.tsx
 'use client';
 
 import { useState } from 'react';
@@ -5,23 +6,13 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Input } from './ui/input'; // shadcn の Input 使ってる前提
+import { Input } from './ui/input';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-
-type Report = {
-  date: string;
-  studyTime: number | null;
-  tasksCompleted: number | null;
-  content: string;
-  aiComment?: string;
-  savedAt: string;
-};
 
 export default function DailyReport() {
   const router = useRouter();
 
-  // 初期値は今日
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [date, setDate] = useState(todayStr);
@@ -34,92 +25,76 @@ export default function DailyReport() {
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
-const handleSave = async () => {
-  setIsSaving(true);
-  setFeedbackError(null);
+  const handleSave = async () => {
+    setFeedbackError(null);
+    setIsSaving(true);
 
-  const parsedStudyTime =
-    studyTime === '' ? null : Number(studyTime);
-  const parsedTasks =
-    tasksCompleted === '' ? null : Number(tasksCompleted);
+    try {
+      // ① 日報を DynamoDB に保存
+      const reportRes = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date,
+          studyTime,
+          tasksCompleted,
+          content,
+        }),
+      });
 
-  // ① localStorage 保存（これは今まで通り）
-  try {
-    if (typeof window !== 'undefined') {
-      const raw = window.localStorage.getItem('studyReports');
-      const list: Report[] = raw ? JSON.parse(raw) : [];
-
-      const newReport: Report = {
-        date,
-        studyTime: isNaN(parsedStudyTime as number) ? null : parsedStudyTime,
-        tasksCompleted: isNaN(parsedTasks as number) ? null : parsedTasks,
-        content,
-        savedAt: new Date().toISOString(),
-      };
-
-      list.push(newReport);
-      window.localStorage.setItem('studyReports', JSON.stringify(list));
-    }
-  } catch (e) {
-    console.error('failed to save local report', e);
-  }
-
-  // ② AIフィードバック API 呼び出し
-  setIsLoadingFeedback(true);
-  try {
-    const res = await fetch('/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content,
-        studyTime: parsedStudyTime,
-        tasksCompleted: parsedTasks,
-      }),
-    });
-
-    console.log('feedback status', res.status); // ★ デバッグログ
-
-    if (!res.ok) {
-      let errBody: any = {};
-      try {
-        errBody = await res.json();
-      } catch {
-        // noop
+      if (!reportRes.ok) {
+        console.error('report save error', await reportRes.text());
+        setFeedbackError('日報の保存に失敗しました。');
+        setIsSaving(false);
+        return;
       }
-      console.error('feedback error body', errBody);
-      setFeedbackError('AIコメントの取得に失敗しました。');
+
+      // ② AIフィードバック
+      setIsLoadingFeedback(true);
+
+      const feedbackRes = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content,
+          studyTime,
+          tasksCompleted,
+        }),
+      });
+
+      if (!feedbackRes.ok) {
+        console.error(
+          'feedback error status',
+          feedbackRes.status,
+          await feedbackRes.text(),
+        );
+        setFeedbackError('AIコメントの取得に失敗しました。');
+        return;
+      }
+
+      const data = await feedbackRes.json().catch(() => ({}));
+      if (data.comment) {
+        setAiComment(data.comment);
+      } else {
+        setAiComment(
+          'コメントを取得できませんでした（comment フィールドが空でした）。',
+        );
+      }
+    } catch (e) {
+      console.error('daily report save/feedback error', e);
+      setFeedbackError('通信エラーが発生しました。');
+    } finally {
       setIsLoadingFeedback(false);
       setIsSaving(false);
-      return;
     }
-
-    const data = await res.json().catch(() => ({}));
-    console.log('feedback data', data); // ★ デバッグログ
-
-    if (data.comment) {
-      setAiComment(data.comment);
-    } else {
-      // comment が無いパターンも一応拾う
-      setAiComment('コメントを取得できませんでした（comment フィールドが空でした）。');
-    }
-  } catch (e) {
-    console.error('feedback fetch failed', e);
-    setFeedbackError('通信エラーが発生しました。');
-  } finally {
-    setIsLoadingFeedback(false);
-    setIsSaving(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div className="flex h-14 items-center px-4">
-          <button
-            onClick={() => router.push('/')}
-            className="mr-3"
-          >
+          <button onClick={() => router.push('/')} className="mr-3">
             <ChevronLeft className="h-6 w-6 text-gray-700" />
           </button>
           <h1 className="text-gray-900">日報</h1>
@@ -127,7 +102,7 @@ const handleSave = async () => {
       </header>
 
       <div className="space-y-4 p-4">
-        <Card className="p-4 space-y-4">
+        <Card className="space-y-4 p-4">
           {/* 日付 */}
           <div className="space-y-2">
             <Label htmlFor="report-date">日付</Label>
@@ -179,7 +154,6 @@ const handleSave = async () => {
             />
           </div>
 
-          {/* 保存ボタン */}
           <Button
             onClick={handleSave}
             disabled={isSaving || isLoadingFeedback}
@@ -191,7 +165,7 @@ const handleSave = async () => {
           </Button>
         </Card>
 
-        {/* AI フィードバック表示エリア */}
+        {/* AIフィードバック */}
         <Card className="space-y-3 bg-amber-50 p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500">
@@ -213,7 +187,7 @@ const handleSave = async () => {
               )}
 
               {!feedbackError && !isLoadingFeedback && aiComment && (
-                <p className="text-sm whitespace-pre-wrap text-gray-700">
+                <p className="whitespace-pre-wrap text-sm text-gray-700">
                   {aiComment}
                 </p>
               )}
