@@ -7,217 +7,221 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { ChevronLeft, Sparkles, Calendar, Check, Edit2 } from 'lucide-react';
 
-const CERT_MASTER = [
-  {
-    code: 'aws-saa',
-    label: 'AWS認定ソリューションアーキテクト - アソシエイト',
-    recommendedWeeklyHours: 10,
-  },
-  {
-    code: 'ap',
-    label: '応用情報技術者',
-    recommendedWeeklyHours: 8,
-  },
-  {
-    code: 'gcp-pa',
-    label: 'Google Cloud Professional Architect',
-    recommendedWeeklyHours: 8,
-  },
-  {
-    code: 'az-admin',
-    label: 'Azure Administrator',
-    recommendedWeeklyHours: 8,
-  },
-  {
-    code: 'toeic-800',
-    label: 'TOEIC 800点',
-    recommendedWeeklyHours: 5,
-  },
-  {
-    code: 'other',
-    label: 'その他',
-    recommendedWeeklyHours: null,
-  },
-] as const;
+import {
+  CERTIFICATIONS,
+  getPlanTemplateForCert,
+  type WeeklyPlan,
+} from '@/src/lib/certifications';
 
-type CertCode = (typeof CERT_MASTER)[number]['code'];
+// ==== 型と共通ユーティリティ ====
 
-type WeeklyPlan = {
-  week: number;
+type DayPlan = {
+  dayIndex: number;   // Day 1, Day 2 ...
+  date: string;       // 'YYYY-MM-DD'
   theme: string;
   topics: string[];
 };
 
-const DEFAULT_PLAN: WeeklyPlan[] = [
-  {
-    week: 1,
-    theme: 'AWSの基礎とIAM',
-    topics: ['アカウント設定', 'IAMユーザー・ロール', 'セキュリティベストプラクティス'],
-  },
-  {
-    week: 2,
-    theme: 'EC2とストレージ',
-    topics: ['EC2インスタンス', 'EBS・EFS', 'S3基礎'],
-  },
-  {
-    week: 3,
-    theme: 'ネットワーキング基礎',
-    topics: ['VPC', 'サブネット', 'ルートテーブル'],
-  },
-  {
-    week: 4,
-    theme: '監視と運用',
-    topics: ['CloudWatch', 'CloudTrail', '基本的な運用設計'],
-  },
-  {
-    week: 5,
-    theme: 'データベース',
-    topics: ['RDS', 'DynamoDB', 'ElastiCache'],
-  },
-  {
-    week: 6,
-    theme: '高可用性とスケーラビリティ',
-    topics: ['マルチAZ', 'スケーリング戦略', 'フェイルオーバー'],
-  },
-  {
-    week: 7,
-    theme: 'セキュリティと暗号化',
-    topics: ['KMS', 'セキュリティグループ', 'NACL'],
-  },
-  {
-    week: 8,
-    theme: '総復習と模擬試験',
-    topics: ['重要ポイント確認', '模擬試験', '弱点の洗い出し'],
-  },
-];
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function parseYmd(ymd: string): Date | null {
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function toDateOnlyString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatJP(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+// 試験日から「だいたい何週間か」を計算（クランプなし）
+function calcWeeksUntilExam(examDateStr: string): number | null {
+  const exam = parseYmd(examDateStr);
+  if (!exam) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffMs = exam.getTime() - today.getTime();
+  const diffDays = diffMs / MS_PER_DAY;
+
+  if (diffDays <= 0) {
+    // もう試験日を過ぎている or 当日
+    return 0;
+  }
+
+  return Math.ceil(diffDays / 7);
+}
+
+function getTodayYmd(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function GoalSetting() {
-  // ステップ制御
+  // ステップ
   const [step, setStep] = useState(1);
 
   // 資格関連
-  const [selectedCertCode, setSelectedCertCode] = useState<CertCode>('aws-saa');
+  const [selectedCertCode, setSelectedCertCode] = useState<string>('aws-saa');
   const [customCertName, setCustomCertName] = useState('');
 
   // 試験日
-  const [examDate, setExamDate] = useState('2025-03-15');
+  const [examDate, setExamDate] = useState(getTodayYmd());
 
-  // 推奨学習時間（週）
-  const [weeklyHours, setWeeklyHours] = useState<number | ''>(10);
+  // 推奨学習時間（週）→ 表示用は string に統一
+  const [weeklyHours, setWeeklyHours] = useState<string>('');
 
-  // 試験日までの週数
+  // 試験日までの週数（ざっくり）
   const [weeksUntilExam, setWeeksUntilExam] = useState<number | null>(null);
 
-  // 計画表示系
+  // 日ごとの計画
+  const [plan, setPlan] = useState<DayPlan[]>([]);
   const [showPlan, setShowPlan] = useState(false);
-  const [editingWeek, setEditingWeek] = useState<number | null>(null);
-  const [plan, setPlan] = useState<WeeklyPlan[]>(DEFAULT_PLAN);
+  const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
 
+  // 選択中資格
   const selectedCert =
-    CERT_MASTER.find((c) => c.code === selectedCertCode) ?? CERT_MASTER[0];
+    CERTIFICATIONS.find((c) => c.code === selectedCertCode) ?? CERTIFICATIONS[0];
 
-  // 画面表示用の資格名
   const displayCertName =
     selectedCertCode === 'other'
       ? customCertName || '（資格名を入力してください）'
-      : selectedCert.label;
+      : selectedCert.name;
 
-  // 試験日から週数を計算
+  // 実際の表示用：計画ができていれば plan から週数を出す
+  const displayWeeks =
+    showPlan && plan.length > 0
+      ? Math.max(1, Math.ceil(plan.length / 7))
+      : weeksUntilExam;
+
+  // 初期表示 / 試験日変更時に週数を計算
   useEffect(() => {
+    const w = calcWeeksUntilExam(examDate);
+    setWeeksUntilExam(w);
+
+    // 資格マスタに defaultWeeklyHours があるなら設定（初期のみ）
+    const cert = CERTIFICATIONS.find((c) => c.code === selectedCertCode);
+    if (cert?.defaultWeeklyHours && weeklyHours === '') {
+      setWeeklyHours(String(cert.defaultWeeklyHours));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examDate]);
+
+  // ==== 計画生成（日付ベース） ====
+  const handleGeneratePlan = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const exam = new Date(examDate);
-    exam.setHours(0, 0, 0, 0);
-
-    const diffMs = exam.getTime() - today.getTime();
-    if (Number.isNaN(diffMs) || diffMs <= 0) {
-      setWeeksUntilExam(0);
+    const exam = parseYmd(examDate);
+    if (!exam) {
+      alert('試験日がおかしいです');
       return;
     }
 
-    const weeks = Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000));
-    setWeeksUntilExam(weeks);
-  }, [examDate]);
+    // 残り日数
+    const diffMs = exam.getTime() - today.getTime();
+    const diffDaysRaw = diffMs / MS_PER_DAY;
+    const totalDays = Math.max(1, Math.ceil(diffDaysRaw));
 
-  const handleGeneratePlan = () => {
-    // ここは今は AI なし。とりあえず既定の計画を表示するだけ。
+    // 週次テンプレ（試験ガイドから設計したやつ）を取得
+    const weeklyTemplate: WeeklyPlan[] =
+      getPlanTemplateForCert(selectedCertCode) ?? [
+        // テンプレがない資格のときの簡易テンプレ
+        {
+          week: 1,
+          theme: 'Week 1 の学習内容',
+          topics: ['公式テキストを読み始める', '出題範囲の全体像を把握する'],
+        },
+      ];
+
+    // 週次テンプレを「個々のトピック」にばらす
+    type FlatTask = { theme: string; topic: string };
+    const flatTasks: FlatTask[] = [];
+    weeklyTemplate.forEach((w) => {
+      w.topics.forEach((t) => {
+        flatTasks.push({ theme: w.theme, topic: t });
+      });
+    });
+
+    const totalTasks = flatTasks.length;
+    const tasksPerDay = Math.max(1, Math.ceil(totalTasks / totalDays));
+
+    const newPlan: DayPlan[] = [];
+
+    for (let i = 0; i < totalDays; i++) {
+      const date = new Date(today.getTime() + i * MS_PER_DAY);
+      const dateStr = toDateOnlyString(date);
+
+      const startIndex = i * tasksPerDay;
+      const dayTasks = flatTasks.slice(startIndex, startIndex + tasksPerDay);
+
+      let theme: string;
+      let topics: string[];
+
+      if (dayTasks.length > 0) {
+        theme = dayTasks[0].theme;
+        topics = dayTasks.map((t) => t.topic);
+      } else {
+        theme = '予備日・復習';
+        topics = ['これまでの内容の復習', '模試や問題演習'];
+      }
+
+      newPlan.push({
+        dayIndex: i + 1,
+        date: dateStr,
+        theme,
+        topics,
+      });
+    }
+
+    setPlan(newPlan);
     setShowPlan(true);
   };
 
-  // 日付 -> 'YYYY-MM-DD'
-  const makeDateKey = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
-
+  // ==== 保存 ====
   const handleSavePlan = async () => {
-    // 1) localStorage に Dashboard 用のデータを保存する
-    try {
-      if (typeof window !== 'undefined') {
-        // studyGoal
-        const goalForStorage = {
-          certName: displayCertName,
-          examDate,
-          weeklyHours: weeklyHours === '' ? null : weeklyHours,
-        };
+    const numericWeeklyHours =
+      weeklyHours === '' ? null : Number(weeklyHours) || null;
 
-        window.localStorage.setItem(
-          'studyGoal',
-          JSON.stringify(goalForStorage),
-        );
+    // 1. Goal（試験情報）を localStorage に保存
+    const goalPayload: StudyGoal = {
+      certName: displayCertName,
+      examDate,
+      weeklyHours: numericWeeklyHours, // number | null
+    };
+    window.localStorage.setItem('studyGoal', JSON.stringify(goalPayload));
 
-        // studyPlan: 週ごとのテーマ＋トピックを
-        // 「今日から順番に1日1トピック」みたいな感じで日別タスクに展開する
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    // 2. Plan（日付ごとの計画）を Dashboard 用に変換して保存
+    const planPayload: PlanItem[] = plan.map((d) => ({
+      date: d.date,             // 'YYYY-MM-DD'
+      title: d.theme,           // とりあえずテーマをタイトルにする
+      estimatedMinutes: 60,     // 仮で1時間にしておくなど
+      weekLabel: `Day ${d.dayIndex}`,
+    }));
+    window.localStorage.setItem('studyPlan', JSON.stringify(planPayload));
 
-        type PlanItemForStorage = {
-          date: string; // 'YYYY-MM-DD'
-          title: string;
-          estimatedMinutes?: number;
-          weekLabel?: string;
-        };
-
-        const planForStorage: PlanItemForStorage[] = [];
-        let offset = 0;
-
-        plan.forEach((w) => {
-          w.topics.forEach((topic) => {
-            const d = new Date(today);
-            d.setDate(d.getDate() + offset);
-
-            planForStorage.push({
-              date: makeDateKey(d),
-              title: `${w.theme}：${topic}`,
-              estimatedMinutes: 30,
-              weekLabel: `Week ${w.week}`,
-            });
-
-            offset += 1;
-          });
-        });
-
-        window.localStorage.setItem(
-          'studyPlan',
-          JSON.stringify(planForStorage),
-        );
-      }
-    } catch (e) {
-      console.error('failed to save to localStorage', e);
-      alert('ローカル保存に失敗しました');
-      return;
-    }
-
-    // 2) API にも投げておく（今はダミーで 200 を返している想定）
     const payload = {
       certCode: selectedCertCode,
       certName: displayCertName,
       examDate,
-      weeklyHours: weeklyHours === '' ? null : weeklyHours,
-      weeksUntilExam,
+      weeklyHours: numericWeeklyHours,
+      weeksUntilExam: displayWeeks, // 表示に使っている週数を保存
       plan,
     };
 
@@ -231,34 +235,36 @@ export default function GoalSetting() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error('save error', err);
-        alert('目標の保存に失敗しました（サーバ側）');
+        alert('目標の保存に失敗しました');
         return;
       }
 
-      alert('目標と学習計画を保存しました！\nホーム画面に反映されます。');
+      alert('目標を保存しました！（バックエンド連携はあとで本実装）');
     } catch (e) {
       console.error(e);
       alert('通信エラーで保存に失敗しました');
     }
   };
 
-  const handleUpdateWeekTheme = (weekNumber: number, newTheme: string) => {
+  // ==== 編集ハンドラ ====
+  const handleUpdateDayTheme = (dayIndex: number, newTheme: string) => {
     setPlan((prev) =>
-      prev.map((w) => (w.week === weekNumber ? { ...w, theme: newTheme } : w)),
+      prev.map((d) => (d.dayIndex === dayIndex ? { ...d, theme: newTheme } : d)),
     );
   };
 
-  const handleUpdateWeekTopics = (weekNumber: number, text: string) => {
+  const handleUpdateDayTopics = (dayIndex: number, text: string) => {
     const topics = text
       .split('\n')
       .map((t) => t.trim())
       .filter(Boolean);
 
     setPlan((prev) =>
-      prev.map((w) => (w.week === weekNumber ? { ...w, topics } : w)),
+      prev.map((d) => (d.dayIndex === dayIndex ? { ...d, topics } : d)),
     );
   };
 
+  // ==== JSX ====
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
@@ -282,11 +288,7 @@ export default function GoalSetting() {
             >
               {step > 1 ? <Check className="h-5 w-5" /> : '1'}
             </div>
-            <div
-              className={`h-0.5 w-12 ${
-                step >= 2 ? 'bg-blue-600' : 'bg-gray-200'
-              }`}
-            />
+            <div className={`h-0.5 w-12 ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`} />
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full ${
                 step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
@@ -294,11 +296,7 @@ export default function GoalSetting() {
             >
               {step > 2 ? <Check className="h-5 w-5" /> : '2'}
             </div>
-            <div
-              className={`h-0.5 w-12 ${
-                step >= 3 ? 'bg-blue-600' : 'bg-gray-200'
-              }`}
-            />
+            <div className={`h-0.5 w-12 ${step >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`} />
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full ${
                 step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
@@ -313,47 +311,47 @@ export default function GoalSetting() {
         {step === 1 && !showPlan && (
           <div className="space-y-4">
             <div>
-              <h2 className="mb-2 text-gray-900">取得したい資格を選択</h2>
+              <h2 className="mb-2 text-gray-900">取得したい資格を選択してください</h2>
               <p className="text-sm text-gray-600">
-                対応している資格は推奨学習時間が自動で入ります。その他の場合は自分で入力できます。
+                AIがあなたに最適な学習計画を作成します
               </p>
             </div>
 
+            {/* 資格プルダウン */}
             <div className="space-y-2">
-              <Label htmlFor="cert-select">資格</Label>
+              <label className="text-sm text-gray-700">資格</label>
               <select
-                id="cert-select"
+                className="w-full rounded-lg border border-gray-300 p-3"
                 value={selectedCertCode}
                 onChange={(e) => {
-                  const code = e.target.value as CertCode;
-                  const cert = CERT_MASTER.find((c) => c.code === code);
+                  const code = e.target.value;
                   setSelectedCertCode(code);
-                  if (cert?.recommendedWeeklyHours != null) {
-                    setWeeklyHours(cert.recommendedWeeklyHours);
+                  const cert = CERTIFICATIONS.find((c) => c.code === code);
+                  if (cert?.defaultWeeklyHours) {
+                    setWeeklyHours(String(cert.defaultWeeklyHours));
                   } else {
                     setWeeklyHours('');
                   }
                 }}
-                className="w-full rounded-lg border border-gray-300 p-3"
               >
-                {CERT_MASTER.map((cert) => (
+                {CERTIFICATIONS.map((cert) => (
                   <option key={cert.code} value={cert.code}>
-                    {cert.label}
+                    {cert.name}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* その他のときだけ資格名入力 */}
             {selectedCertCode === 'other' && (
               <div className="space-y-2">
-                <Label htmlFor="custom-cert">資格名</Label>
+                <label className="text-sm text-gray-700">資格名</label>
                 <input
-                  id="custom-cert"
                   type="text"
+                  className="w-full rounded-lg border border-gray-300 p-3"
+                  placeholder="例: 情報処理安全確保支援士"
                   value={customCertName}
                   onChange={(e) => setCustomCertName(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 p-3"
-                  placeholder="例）AWS認定 デベロッパー アソシエイト"
                 />
               </div>
             )}
@@ -393,58 +391,45 @@ export default function GoalSetting() {
                       id="exam-date"
                       type="date"
                       value={examDate}
-                      onChange={(e) => setExamDate(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setExamDate(value);
+                        const w = calcWeeksUntilExam(value);
+                        setWeeksUntilExam(w);
+                      }}
                       className="w-full rounded-lg border border-gray-300 p-3 pr-10"
                     />
                     <Calendar className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>学習期間</Label>
-                    <div className="mt-2 rounded-lg bg-gray-50 p-3">
-                      <p className="text-gray-900">
-                        {weeksUntilExam != null
-                          ? `${weeksUntilExam}週間`
-                          : '―'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weekly-hours">推奨学習時間（週）</Label>
-                    <input
-                      id="weekly-hours"
-                      type="number"
-                      value={weeklyHours}
-                      onChange={(e) =>
-                        setWeeklyHours(
-                          e.target.value === '' ? '' : Number(e.target.value),
-                        )
-                      }
-                      className="mt-2 w-full rounded-lg border border-gray-300 p-3"
-                      placeholder="例）10"
-                    />
-                  </div>
+                <div className="flex items-center justify-between border-b border-gray-100 py-2">
+                  <span className="text-sm text-gray-600">学習期間</span>
+                  <span className="text-sm text-gray-900">
+                    {displayWeeks != null ? `${displayWeeks}週間` : '—'}
+                  </span>
                 </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-600">推奨学習時間</span>
+                  <span className="text-sm text-gray-900">
+                    {weeklyHours ? `週${weeklyHours}時間` : '—'}
+                  </span>
+                </div>
+              </div>
 
-                <div className="rounded-lg bg-blue-50 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600">
-                      <Sparkles className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-900">
-                        試験まであと
-                        {weeksUntilExam != null
-                          ? `約 ${weeksUntilExam}週間`
-                          : '―'}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-600">
-                        週あたりの学習時間は、生活リズムに合わせて現実的な値に調整してください。
-                      </p>
-                    </div>
+              <div className="mt-4 rounded-lg bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600">
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-900">
+                      試験まであと
+                      {weeksUntilExam != null ? `約 ${weeksUntilExam}週間` : '―'}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      週あたりの学習時間は、生活リズムに合わせて現実的な値に調整してください。
+                    </p>
                   </div>
                 </div>
               </div>
@@ -468,13 +453,13 @@ export default function GoalSetting() {
           </div>
         )}
 
-        {/* STEP 3: 計画の確認 */}
+        {/* STEP 3: 概要確認＋「日付ベース計画を作る」 */}
         {step === 3 && !showPlan && (
           <div className="space-y-4">
             <div>
               <h2 className="mb-2 text-gray-900">学習計画の確認</h2>
               <p className="text-sm text-gray-600">
-                現時点では、固定のテンプレート計画をベースにしています。後でAI生成に差し替える予定です。
+                試験日までの残り日数に合わせて、日付ごとの計画を自動で割り振ります。
               </p>
             </div>
 
@@ -482,9 +467,7 @@ export default function GoalSetting() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">資格</span>
-                  <span className="text-sm text-gray-900">
-                    {displayCertName}
-                  </span>
+                  <span className="text-sm text-gray-900">{displayCertName}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">試験日</span>
@@ -493,13 +476,11 @@ export default function GoalSetting() {
                 <div className="flex items-center justify-between border-b border-gray-100 py-2">
                   <span className="text-sm text-gray-600">学習期間</span>
                   <span className="text-sm text-gray-900">
-                    {weeksUntilExam != null ? `${weeksUntilExam}週間` : '―'}
+                    {displayWeeks != null ? `${displayWeeks}週間` : '―'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600">
-                    推奨学習時間（週）
-                  </span>
+                  <span className="text-sm text-gray-600">推奨学習時間（週）</span>
                   <span className="text-sm text-gray-900">
                     {weeklyHours !== '' ? `${weeklyHours}時間` : '未設定'}
                   </span>
@@ -513,14 +494,14 @@ export default function GoalSetting() {
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-gray-900">学習アシスタント</p>
+                  <p className="text-gray-900">日付ごとの学習計画</p>
                   <p className="text-sm text-gray-600">
-                    今はテンプレ計画ですが、あとでAIで自動生成に変える予定です。
+                    今日から試験日までの各日に、テンプレートの内容を順番に割り振ります。
                   </p>
                 </div>
               </div>
               <p className="text-sm text-gray-700">
-                この内容でひとまずスタートして、実際の進捗を見ながら計画をアップデートしていきましょう。
+                「1週間で試験」のような短期でも対応できるように、週ではなく日単位でスケジュールを作成します。
               </p>
             </div>
 
@@ -536,23 +517,22 @@ export default function GoalSetting() {
                 onClick={handleGeneratePlan}
                 className="h-12 flex-1 bg-blue-600 text-white hover:bg-blue-700"
               >
-                計画を表示する
+                日付ごとの計画を作成する
               </Button>
             </div>
           </div>
         )}
 
-        {/* 計画リスト表示（テンプレ＋編集可） */}
+        {/* 日付ごとの計画表示 */}
         {showPlan && (
           <div className="space-y-4">
             <div className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white">
               <div className="mb-2 flex items-center gap-2">
                 <Sparkles className="h-5 w-5" />
-                <h2>学習計画</h2>
+                <h2>日付ごとの学習計画</h2>
               </div>
               <p className="text-sm text-blue-100">
-                週ごとのテーマと学習内容を編集できます。後でこの内容を DynamoDB
-                に保存します。
+                1日ごとのテーマと学習内容を編集できます。
               </p>
             </div>
 
@@ -567,77 +547,78 @@ export default function GoalSetting() {
                   <span>{examDate}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>学習期間</span>
+                  <span>学習期間（週換算）</span>
                   <span>
-                    {weeksUntilExam != null ? `${weeksUntilExam}週間` : '―'}
+                    {displayWeeks != null ? `${displayWeeks}週間` : '―'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>推奨学習時間（週）</span>
-                  <span>
-                    {weeklyHours !== '' ? `${weeklyHours}時間` : '未設定'}
-                  </span>
+                  <span>{weeklyHours !== '' ? `${weeklyHours}時間` : '未設定'}</span>
                 </div>
               </div>
             </Card>
 
             <div className="space-y-3">
-              {plan.map((week) => (
-                <Card key={week.week} className="p-4">
+              {plan.map((day) => (
+                <Card key={day.date} className="p-4">
                   <div className="mb-3 flex items-start justify-between">
                     <div className="flex-1">
                       <div className="mb-1 flex items-center gap-2">
                         <span className="text-sm text-gray-600">
-                          Week {week.week}
+                          Day {day.dayIndex}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          （{formatJP(day.date)}）
                         </span>
                       </div>
-                      <h3 className="text-gray-900">{week.theme}</h3>
+                      <h3 className="text-gray-900">{day.theme}</h3>
                     </div>
                     <button
+                      type="button"
                       onClick={() =>
-                        setEditingWeek(
-                          editingWeek === week.week ? null : week.week,
+                        setEditingDayIndex(
+                          editingDayIndex === day.dayIndex ? null : day.dayIndex,
                         )
                       }
                       className="p-1 text-blue-600"
-                      type="button"
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
                   </div>
 
-                  {editingWeek === week.week ? (
+                  {editingDayIndex === day.dayIndex ? (
                     <div className="space-y-2">
                       <Label>テーマを編集</Label>
                       <input
                         type="text"
-                        defaultValue={week.theme}
+                        defaultValue={day.theme}
                         onBlur={(e) =>
-                          handleUpdateWeekTheme(week.week, e.target.value)
+                          handleUpdateDayTheme(day.dayIndex, e.target.value)
                         }
                         className="w-full rounded-lg border border-gray-300 p-2"
                       />
                       <Label>学習内容（1行1トピック）</Label>
                       <Textarea
-                        defaultValue={week.topics.join('\n')}
+                        defaultValue={day.topics.join('\n')}
                         rows={3}
                         className="w-full"
                         onBlur={(e) =>
-                          handleUpdateWeekTopics(week.week, e.target.value)
+                          handleUpdateDayTopics(day.dayIndex, e.target.value)
                         }
                       />
                       <Button
-                        onClick={() => setEditingWeek(null)}
+                        type="button"
+                        onClick={() => setEditingDayIndex(null)}
                         size="sm"
                         className="w-full bg-blue-600 text-white hover:bg-blue-700"
-                        type="button"
                       >
                         編集を終了
                       </Button>
                     </div>
                   ) : (
                     <ul className="space-y-1">
-                      {week.topics.map((topic, idx) => (
+                      {day.topics.map((topic, idx) => (
                         <li
                           key={idx}
                           className="flex items-start gap-2 text-sm text-gray-700"

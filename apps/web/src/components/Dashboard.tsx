@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
-import { Checkbox } from './ui/checkbox';
 import {
   Calendar,
   Sparkles,
@@ -41,13 +40,9 @@ type UiTask = {
   id: number;
   title: string;
   duration: string;
-  completed: boolean;
   category?: string;
 };
 
-const weekDayLabels = ['月', '火', '水', '木', '金', '土', '日'] as const;
-
-// 日付 -> 'YYYY-MM-DD'
 function makeDateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -62,16 +57,15 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState<UiTask[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
 
-  // 「今日」のキーは固定で一回計算
+  // 「今日」のキー（0:00固定）
   const todayDate = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
-
   const todayKey = useMemo(() => makeDateKey(todayDate), [todayDate]);
 
-  // ローカルストレージから目標・計画・日報を読み込み
+  // ローカルストレージから読み込み
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -86,7 +80,7 @@ export default function Dashboard() {
       console.error('failed to load studyGoal', e);
     }
 
-    // 今日のタスク（studyPlan から今日の日付のものだけ）
+    // 今日のタスク
     try {
       const rawPlan = window.localStorage.getItem('studyPlan');
       if (rawPlan) {
@@ -98,7 +92,6 @@ export default function Dashboard() {
           duration: p.estimatedMinutes
             ? `${p.estimatedMinutes}分`
             : '30分',
-          completed: false,
           category: p.weekLabel,
         }));
         setTasks(uiTasks);
@@ -121,18 +114,7 @@ export default function Dashboard() {
     }
   }, [todayKey]);
 
-  // 今日のタスクのチェック
-  const toggleTask = (id: number) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, completed: !t.completed } : t,
-      ),
-    );
-  };
-
-  const completedTasks = tasks.filter((t) => t.completed).length;
-
-  // 日報のインデックス化（勉強した日セット）
+  // 日付ごと「勉強したか」
   const dateHasStudy = useMemo(() => {
     const s = new Set<string>();
     reports.forEach((r) => {
@@ -143,7 +125,7 @@ export default function Dashboard() {
     return s;
   }, [reports]);
 
-  // 最新の日報
+  // 最新日報
   const latestReport = useMemo(() => {
     if (!reports.length) return null;
     const sorted = [...reports].sort(
@@ -165,42 +147,12 @@ export default function Dashboard() {
       exam.getDate(),
     );
     const diffMs = examDateOnly.getTime() - todayDate.getTime();
-    const diffDays = Math.ceil(
-      diffMs / (1000 * 60 * 60 * 24),
-    );
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     if (diffDays < 0) return 0;
     return diffDays;
   }, [goal, todayDate]);
 
-  // 今週（月〜日）の日付配列
-  const weekDates = useMemo(() => {
-    const base = new Date(todayDate);
-    const day = base.getDay(); // 0:日〜6:土
-    const diff = (day === 0 ? -6 : 1) - day; // 月曜日に合わせる
-    const monday = new Date(base);
-    monday.setDate(base.getDate() + diff);
-
-    const arr: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      d.setHours(0, 0, 0, 0);
-      arr.push(d);
-    }
-    return arr;
-  }, [todayDate]);
-
-  // 今週の進捗（各曜日に日報があるかどうか）
-  const weekProgressState = useMemo(
-    () =>
-      weekDates.map((d, idx) => ({
-        day: weekDayLabels[idx],
-        completed: dateHasStudy.has(makeDateKey(d)),
-      })),
-    [weekDates, dateHasStudy],
-  );
-
-  // 連続日数（今日からさかのぼって）
+  // 連続日数（今日からさかのぼり）
   const streakDays = useMemo(() => {
     let count = 0;
     let d = new Date(todayDate);
@@ -217,7 +169,7 @@ export default function Dashboard() {
     return count;
   }, [todayDate, dateHasStudy]);
 
-  // 全期間の完了タスク数（日報の tasksCompleted 合計）
+  // 完了タスク数（全日報の tasksCompleted 合計）
   const totalTasksCompleted = useMemo(
     () =>
       reports.reduce(
@@ -227,24 +179,32 @@ export default function Dashboard() {
     [reports],
   );
 
-  // 今週の学習時間合計
+  // 今週の学習時間（時間）
   const weekStudyHours = useMemo(() => {
-    if (!weekDates.length) return 0;
-    const start = weekDates[0];
-    const end = weekDates[weekDates.length - 1];
+    // 今週の月〜日
+    const base = new Date(todayDate);
+    const day = base.getDay(); // 0:日〜6:土
+    const diff = (day === 0 ? -6 : 1) - day; // 月曜日に合わせる
+    const monday = new Date(base);
+    monday.setDate(base.getDate() + diff);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
 
-    const startKey = makeDateKey(start);
-    const endKey = makeDateKey(end);
+    const startKey = makeDateKey(monday);
+    const endKey = makeDateKey(sunday);
 
-    return reports.reduce((sum, r) => {
+    const total = reports.reduce((sum, r) => {
       if (r.date >= startKey && r.date <= endKey) {
         return sum + (r.studyTime ?? 0);
       }
       return sum;
     }, 0);
-  }, [weekDates, reports]);
 
-  // ざっくり学習進捗パーセンテージ
+    return total;
+  }, [todayDate, reports]);
+
+  // ざっくり学習進捗
   const totalProgress = useMemo(() => {
     if (!goal?.weeklyHours || !daysUntilExam || daysUntilExam <= 0) {
       return 0;
@@ -265,17 +225,16 @@ export default function Dashboard() {
     );
   }, [goal, daysUntilExam, reports]);
 
-  // 時間帯に応じた挨拶
+  // 時間帯に応じたあいさつ（ちゃんと現在時刻を見る）
   const greeting = useMemo(() => {
-    const h = todayDate.getHours();
+    const h = new Date().getHours();
     if (h < 5) return '夜更かしさんですね';
     if (h < 11) return 'おはようございます';
     if (h < 18) return 'こんにちは';
     return 'こんばんは';
-  }, [todayDate]);
+  }, []);
 
   return (
-    // フッター分の余白も確保
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* ===== Header ===== */}
       <header className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
@@ -319,7 +278,7 @@ export default function Dashboard() {
                 </div>
                 <Progress
                   value={totalProgress}
-                  className="h-2 bg-white/20"
+                  className="h-2 bg白/20"
                 />
               </div>
             </Card>
@@ -336,51 +295,12 @@ export default function Dashboard() {
 
       {/* ===== Main Content ===== */}
       <div className="-mt-2 space-y-4 p-4">
-        {/* Week Progress */}
-        <Card className="p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-gray-900">今週の進捗</h2>
-            <span className="text-sm text-gray-600">
-              {weekProgressState.filter((d) => d.completed).length}/7日
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-1">
-            {weekProgressState.map((day, idx) => (
-              <div
-                key={idx}
-                className="flex flex-1 flex-col items-center gap-2"
-              >
-                <div
-                  className={`flex aspect-square w-full items-center justify-center rounded-lg transition-colors ${
-                    day.completed
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}
-                >
-                  {day.completed ? (
-                    <div className="flex h-4 w-4 items-center justify-center rounded-full bg-white">
-                      <div className="h-2 w-2 rounded-full bg-blue-600" />
-                    </div>
-                  ) : (
-                    <div className="h-4 w-4 rounded-full border-2 border-current" />
-                  )}
-                </div>
-                <span className="text-xs text-gray-600">
-                  {day.day}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Today's Tasks */}
+        {/* 今日のタスク */}
         <Card className="p-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-gray-900">今日のタスク</h2>
             <span className="text-sm text-blue-600">
-              {tasks.length
-                ? `${completedTasks}/${tasks.length}`
-                : '未設定'}
+              {tasks.length ? `${tasks.length}件` : '未設定'}
             </span>
           </div>
 
@@ -394,26 +314,11 @@ export default function Dashboard() {
               {tasks.map((task) => (
                 <div
                   key={task.id}
-                  className={`rounded-lg border-2 p-3 transition-all ${
-                    task.completed
-                      ? 'border-blue-200 bg-blue-50'
-                      : 'border-gray-200 bg-white'
-                  }`}
+                  className="rounded-lg border-2 border-gray-200 bg-white p-3"
                 >
                   <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={task.completed}
-                      onCheckedChange={() => toggleTask(task.id)}
-                      className="mt-0.5"
-                    />
                     <div className="min-w-0 flex-1">
-                      <p
-                        className={`text-sm ${
-                          task.completed
-                            ? 'text-gray-500 line-through'
-                            : 'text-gray-900'
-                        }`}
-                      >
+                      <p className="text-sm text-gray-900">
                         {task.title}
                       </p>
                       <div className="mt-1 flex items-center gap-3">
@@ -435,7 +340,7 @@ export default function Dashboard() {
           )}
         </Card>
 
-        {/* Daily Report CTA */}
+        {/* 日報 CTA */}
         <Card className="border-blue-200 bg-gradient-to-br from-indigo-50 to-blue-50 p-4">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600">
@@ -449,7 +354,7 @@ export default function Dashboard() {
             </div>
           </div>
           <Button
-            onClick={() => router.push('report')}
+            onClick={() => router.push('/report')}
             className="w-full bg-blue-600 text-white hover:bg-blue-700"
           >
             日報を書く
@@ -457,7 +362,7 @@ export default function Dashboard() {
           </Button>
         </Card>
 
-        {/* Quick Stats */}
+        {/* 統計3つ */}
         <div className="grid grid-cols-3 gap-3">
           <Card className="p-3 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-green-100">
@@ -488,7 +393,7 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* AI Suggestion / 直近日報サマリ */}
+        {/* 直近日報サマリ（将来AI差し替え予定） */}
         <Card className="border-amber-200 bg-amber-50 p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500">
@@ -510,7 +415,6 @@ export default function Dashboard() {
                     {latestReport.content || '（内容未入力）'}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    ※ この部分はのちほど AI コメントに差し替え予定
                   </p>
                 </>
               ) : (
@@ -524,33 +428,33 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* ===== 固定フッター ナビゲーション ===== */}
+      {/* ===== フッター ===== */}
       <nav className="fixed bottom-0 left-0 right-0 border-t bg-white">
         <div className="mx-auto flex h-14 max-w-md items-center justify-around text-xs">
           <button
             className="flex flex-col items-center text-blue-600"
-            onClick={() => router.push('home')}
+            onClick={() => router.push('/')}
           >
             <span>ホーム</span>
           </button>
 
           <button
             className="flex flex-col items-center text-gray-600"
-            onClick={() => router.push('calendar')}
+            onClick={() => router.push('/calendar')}
           >
             <span>カレンダー</span>
           </button>
 
           <button
             className="flex flex-col items-center text-gray-600"
-            onClick={() => router.push('report')}
+            onClick={() => router.push('/report')}
           >
             <span>日報</span>
           </button>
 
           <button
             className="flex flex-col items-center text-gray-600"
-            onClick={() => router.push('goal')}
+            onClick={() => router.push('/goal')}
           >
             <span>目標</span>
           </button>

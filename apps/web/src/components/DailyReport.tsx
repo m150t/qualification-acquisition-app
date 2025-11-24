@@ -5,214 +5,226 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { ChevronLeft } from 'lucide-react';
+import { Input } from './ui/input'; // shadcn の Input 使ってる前提
+import { ChevronLeft, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-interface DailyReportProps {
-  onBack: () => void;
-}
-
-type DailyReportForm = {
+type Report = {
   date: string;
-  studyTime: string;      // "1.5" など
-  tasksCompleted: string; // 数字だけど、input は string で持つ
+  studyTime: number | null;
+  tasksCompleted: number | null;
   content: string;
+  aiComment?: string;
+  savedAt: string;
 };
 
-function getTodayISODate() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+export default function DailyReport() {
+  const router = useRouter();
 
-export function DailyReport({ onBack }: DailyReportProps) {
-  const [form, setForm] = useState<DailyReportForm>({
-    date: getTodayISODate(),
-    studyTime: '',
-    tasksCompleted: '',
-    content: '',
-  });
+  // 初期値は今日
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  const [submitting, setSubmitting] = useState(false);
-  const [lastSavedMessage, setLastSavedMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [date, setDate] = useState(todayStr);
+  const [studyTime, setStudyTime] = useState<string>('');
+  const [tasksCompleted, setTasksCompleted] = useState<string>('');
+  const [content, setContent] = useState('');
+  const [aiComment, setAiComment] = useState<string>('');
 
-  const handleChange = (
-    field: keyof DailyReportForm,
-    value: string,
-  ) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setErrorMessage(null);
-    setLastSavedMessage(null);
+const handleSave = async () => {
+  setIsSaving(true);
+  setFeedbackError(null);
 
-    const payload = {
-      date: form.date,
-      studyTime: form.studyTime,
-      tasksCompleted: form.tasksCompleted === '' ? null : Number(form.tasksCompleted),
-      content: form.content,
-    };
+  const parsedStudyTime =
+    studyTime === '' ? null : Number(studyTime);
+  const parsedTasks =
+    tasksCompleted === '' ? null : Number(tasksCompleted);
 
-    try {
-      const res = await fetch('/api/reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+  // ① localStorage 保存（これは今まで通り）
+  try {
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem('studyReports');
+      const list: Report[] = raw ? JSON.parse(raw) : [];
 
-      const text = await res.text();
+      const newReport: Report = {
+        date,
+        studyTime: isNaN(parsedStudyTime as number) ? null : parsedStudyTime,
+        tasksCompleted: isNaN(parsedTasks as number) ? null : parsedTasks,
+        content,
+        savedAt: new Date().toISOString(),
+      };
 
-      if (!res.ok) {
-        console.error('report save error status=', res.status, 'body=', text);
-        setErrorMessage('日報の保存に失敗しました');
-        return;
-      }
-
-      console.log('report save success:', text);
-          // ======== ここから localStorage 保存部分 ========
-      if (typeof window !== 'undefined') {
-        try {
-          const key = 'studyReports';
-          const existing = window.localStorage.getItem(key);
-          let reports: any[] = [];
-
-          if (existing) {
-            reports = JSON.parse(existing);
-            if (!Array.isArray(reports)) {
-              reports = [];
-            }
-          }
-
-          reports.push({
-            date: payload.date,
-            studyTime: payload.studyTime === '' ? null : Number(payload.studyTime),
-            tasksCompleted: payload.tasksCompleted,
-            content: payload.content,
-            savedAt: new Date().toISOString(),
-          });
-
-          window.localStorage.setItem(key, JSON.stringify(reports));
-          console.log('localStorage saved:', reports);
-        } catch (e) {
-          console.error('localStorage save error', e);
-        }
-      }
-      setLastSavedMessage('日報を保存しました（今はダミーAPIですがフローはOK）');
-
-      // 保存後、内容だけサクッと残したいならここでクリアするかどうか決める
-      // 今回は一旦フォームはそのままにしておく
-      // setForm({ date: getTodayISODate(), studyTime: '', tasksCompleted: '', content: '' });
-    } catch (e) {
-      console.error('report fetch error', e);
-      setErrorMessage('通信エラーで保存に失敗しました');
-    } finally {
-      setSubmitting(false);
+      list.push(newReport);
+      window.localStorage.setItem('studyReports', JSON.stringify(list));
     }
-  };
+  } catch (e) {
+    console.error('failed to save local report', e);
+  }
+
+  // ② AIフィードバック API 呼び出し
+  setIsLoadingFeedback(true);
+  try {
+    const res = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content,
+        studyTime: parsedStudyTime,
+        tasksCompleted: parsedTasks,
+      }),
+    });
+
+    console.log('feedback status', res.status); // ★ デバッグログ
+
+    if (!res.ok) {
+      let errBody: any = {};
+      try {
+        errBody = await res.json();
+      } catch {
+        // noop
+      }
+      console.error('feedback error body', errBody);
+      setFeedbackError('AIコメントの取得に失敗しました。');
+      setIsLoadingFeedback(false);
+      setIsSaving(false);
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    console.log('feedback data', data); // ★ デバッグログ
+
+    if (data.comment) {
+      setAiComment(data.comment);
+    } else {
+      // comment が無いパターンも一応拾う
+      setAiComment('コメントを取得できませんでした（comment フィールドが空でした）。');
+    }
+  } catch (e) {
+    console.error('feedback fetch failed', e);
+    setFeedbackError('通信エラーが発生しました。');
+  } finally {
+    setIsLoadingFeedback(false);
+    setIsSaving(false);
+  }
+};
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-4">
+    <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="flex items-center justify-between h-14 px-4">
-          <div className="flex items-center">
-            <button onClick={onBack} className="mr-3">
-              <ChevronLeft className="w-6 h-6 text-gray-700" />
-            </button>
-            <h1 className="text-gray-900">日報</h1>
-          </div>
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+        <div className="flex h-14 items-center px-4">
+          <button
+            onClick={() => router.push('/')}
+            className="mr-3"
+          >
+            <ChevronLeft className="h-6 w-6 text-gray-700" />
+          </button>
+          <h1 className="text-gray-900">日報</h1>
         </div>
       </header>
 
-      <div className="p-4 space-y-4">
+      <div className="space-y-4 p-4">
         <Card className="p-4 space-y-4">
           {/* 日付 */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="report-date">日付</Label>
-            <input
+            <Input
               id="report-date"
               type="date"
-              value={form.date}
-              onChange={(e) => handleChange('date', e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
             />
           </div>
 
           {/* 学習時間 */}
-          <div className="space-y-1">
-            <Label htmlFor="report-time">学習時間（時間）</Label>
-            <input
-              id="report-time"
+          <div className="space-y-2">
+            <Label htmlFor="study-time">学習時間（時間）</Label>
+            <Input
+              id="study-time"
               type="number"
-              step="0.5"
-              min="0"
-              placeholder="例：1.5"
-              value={form.studyTime}
-              onChange={(e) => handleChange('studyTime', e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              min={0}
+              step={0.5}
+              value={studyTime}
+              onChange={(e) => setStudyTime(e.target.value)}
+              placeholder="例）1.5"
             />
           </div>
 
           {/* 完了タスク数 */}
-          <div className="space-y-1">
-            <Label htmlFor="report-tasks">完了タスク数</Label>
-            <input
-              id="report-tasks"
+          <div className="space-y-2">
+            <Label htmlFor="tasks-completed">完了タスク数</Label>
+            <Input
+              id="tasks-completed"
               type="number"
-              min="0"
-              placeholder="例：3"
-              value={form.tasksCompleted}
-              onChange={(e) => handleChange('tasksCompleted', e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              min={0}
+              step={1}
+              value={tasksCompleted}
+              onChange={(e) => setTasksCompleted(e.target.value)}
+              placeholder="例）3"
             />
           </div>
 
-          {/* 内容 */}
-          <div className="space-y-1">
-            <Label htmlFor="report-content">今日学習した内容</Label>
+          {/* 学習内容 */}
+          <div className="space-y-2">
+            <Label htmlFor="content">今日やったこと</Label>
             <Textarea
-              id="report-content"
-              rows={6}
-              placeholder="IAMの基礎、EC2の起動、模擬試験50問 など、後から見てわかるくらいにざっくり書く"
-              value={form.content}
-              onChange={(e) => handleChange('content', e.target.value)}
+              id="content"
+              rows={5}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="例）IAMポリシーの基本を学んだ。EC2ハンズオンを1章分進めた など"
             />
           </div>
 
-          {/* ステータス */}
-          {errorMessage && (
-            <p className="text-sm text-red-600">
-              {errorMessage}
-            </p>
-          )}
-          {lastSavedMessage && (
-            <p className="text-sm text-green-600">
-              {lastSavedMessage}
-            </p>
-          )}
-
-          {/* 送信ボタン */}
+          {/* 保存ボタン */}
           <Button
-            onClick={handleSubmit}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
-            disabled={submitting}
+            onClick={handleSave}
+            disabled={isSaving || isLoadingFeedback}
+            className="w-full bg-blue-600 text-white hover:bg-blue-700"
           >
-            {submitting ? '送信中…' : '日報を保存する'}
+            {isSaving || isLoadingFeedback
+              ? '保存中… / AIコメント取得中…'
+              : '保存してAIコメントを見る'}
           </Button>
         </Card>
 
-        {/* 後で AI コメントを表示する場所（今はダミー） */}
-        <Card className="p-4 bg-indigo-50 border-indigo-200">
-          <p className="text-sm text-gray-700">
-            ※この枠に、後で「AIからの日報フィードバック」を表示する予定。今はまだダミーです。
-          </p>
+        {/* AI フィードバック表示エリア */}
+        <Card className="space-y-3 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-900">
+                AIフィードバック
+              </p>
+
+              {feedbackError && (
+                <p className="text-sm text-red-600">{feedbackError}</p>
+              )}
+
+              {!feedbackError && isLoadingFeedback && (
+                <p className="text-sm text-gray-700">
+                  コメントを生成中です…
+                </p>
+              )}
+
+              {!feedbackError && !isLoadingFeedback && aiComment && (
+                <p className="text-sm whitespace-pre-wrap text-gray-700">
+                  {aiComment}
+                </p>
+              )}
+
+              {!feedbackError && !isLoadingFeedback && !aiComment && (
+                <p className="text-sm text-gray-500">
+                  まだAIコメントはありません。「保存してAIコメントを見る」を押すと表示されます。
+                </p>
+              )}
+            </div>
+          </div>
         </Card>
       </div>
     </div>
