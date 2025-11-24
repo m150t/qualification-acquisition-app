@@ -1,5 +1,4 @@
 {
-{
   "name": "webtmp",
   "version": "0.1.0",
   "scripts": {
@@ -26,5 +25,4 @@
     "eslint-config-next": "16.0.1",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
-}
+ }
