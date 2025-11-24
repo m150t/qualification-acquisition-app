@@ -2,13 +2,21 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
-// Amplify の環境変数側で APP_REGION を設定しておく（例: ap-northeast-1）
-const REGION = process.env.APP_REGION || 'ap-northeast-1';
+const region = process.env.DDB_REGION || 'ap-northeast-1';
+
+const hasExplicitCreds =
+  !!process.env.DDB_ACCESS_KEY_ID && !!process.env.DDB_SECRET_ACCESS_KEY;
 
 const client = new DynamoDBClient({
-  region: REGION,
-  // ★ IAMロールを使うので credentials は一切指定しない
-  // credentials を指定しなければ、Lambda/Amplify の実行ロールから自動取得される
+  region,
+  // ローカル & Amplify ともに、環境変数を見てあればそれを使う
+  // 無ければ default provider (プロファイル / ロール) にフォールバック
+  credentials: hasExplicitCreds
+    ? {
+        accessKeyId: process.env.DDB_ACCESS_KEY_ID as string,
+        secretAccessKey: process.env.DDB_SECRET_ACCESS_KEY as string,
+      }
+    : undefined,
 });
 
 export const ddb = DynamoDBDocumentClient.from(client, {
