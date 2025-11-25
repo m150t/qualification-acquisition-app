@@ -22,6 +22,19 @@ type DayPlan = {
   topics: string[];
 };
 
+type StudyGoal = {
+  certName: string;
+  examDate: string; // 'YYYY-MM-DD'
+  weeklyHours: number | null;
+};
+
+type PlanItem = {
+  date: string;
+  title: string;
+  estimatedMinutes?: number;
+  weekLabel?: string;
+};
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function parseYmd(ymd: string): Date | null {

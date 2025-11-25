@@ -40,8 +40,6 @@ ${content}
           content: prompt,
         },
       ],
-      // ❌ max_tokens は絶対に書かない
-      // ❌ max_completion_tokens も一旦なしで動かす
     });
 
     const comment =

@@ -1,7 +1,7 @@
 // apps/web/src/lib/goals.ts
 import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
-import { ddbDocClient } from './dynamodb';
+import { ddb } from './dynamodb';
 
 const TABLE_NAME = process.env.GOALS_TABLE_NAME || 'study_goals';
 
@@ -38,7 +38,7 @@ export async function saveGoal(input: SaveGoalInput) {
     createdAt: new Date().toISOString(),
   };
 
-  await ddbDocClient.send(
+  await ddb.send(
     new PutCommand({
       TableName: TABLE_NAME,
       Item: item,

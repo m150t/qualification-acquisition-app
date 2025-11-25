@@ -5,7 +5,7 @@ import { v4 as uuid } from 'uuid';
 import type { Goal, PlanItem, DailyLog } from '@study/shared';
 
 type S = {
-  goal: Goal;
+  goal: Goal | null; 
   plan: PlanItem[];
   logs: DailyLog[];
   setGoal: (g: Goal) => void;
@@ -14,7 +14,7 @@ type S = {
   addLog: (l: DailyLog) => void;
 };
 export const useStudy = create<S>()(persist((set,get)=>({
-  goal: undefined,
+  goal: null,
   plan: [],
   logs: [],
   setGoal: (goal)=> set({ goal }),
