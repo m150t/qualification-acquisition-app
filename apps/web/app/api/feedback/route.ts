@@ -42,15 +42,12 @@ ${content}
       max_completion_tokens: 200,
     });
 
+    // ★ ここだけシンプルに
     const raw = completion.choices[0]?.message?.content;
-
-    // content が string | null | Array のパターンがあるので一応ケア
-    let commentText = '';
-    if (typeof raw === 'string') {
-      commentText = raw;
-    } else if (Array.isArray(raw)) {
-      commentText = raw.map((p: any) => p.text ?? '').join('');
-    }
+    const commentText =
+      typeof raw === 'string'
+        ? raw
+        : ''; // 文字列じゃなければ空にしておく
 
     console.log('feedback comment', commentText);
 
