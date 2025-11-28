@@ -41,19 +41,35 @@ ${content}
       ],
       max_completion_tokens: 200,
     });
+    const msg = completion.choices[0]?.message;
+    let commentText = '';
 
-    // ★ ここだけシンプルに
-    const raw = completion.choices[0]?.message?.content;
-    const commentText =
-      typeof raw === 'string'
-        ? raw
-        : ''; // 文字列じゃなければ空にしておく
+    if (typeof msg?.content === 'string') {
+      commentText = msg.content;
+    } else if (Array.isArray(msg?.content)) {
+      // content が配列の場合（multi-part）
+      commentText = msg.content
+        .map((part: any) => {
+          if (typeof part === 'string') return part;
+          if (typeof part?.text === 'string') return part.text;
+          if (typeof part?.content === 'string') return part.content;
+          return '';
+        })
+        .join('');
+    }
 
     console.log('feedback comment', commentText);
 
-    return NextResponse.json({ comment: commentText });
-  } catch (err) {
-    console.error('feedback api error', err);
+    if (!commentText) {
+      return NextResponse.json(
+        {
+          comment:
+            'コメントを取得できませんでしたが、学習おつかれさま！自分なりに続けられているだけで十分えらいです。',
+        },
+        { status: 200 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'AIコメント生成に失敗しました' },
       { status: 500 },
