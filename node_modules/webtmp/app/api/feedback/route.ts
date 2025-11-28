@@ -1,21 +1,13 @@
-// app/api/feedback/route.ts
+// apps/web/app/api/feedback/route.ts
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-
-    if (!apiKey) {
-      console.error('OPENAI_API_KEY is not set on server'); // デバッグ用
-      return NextResponse.json(
-        { error: 'サーバ側の設定エラー: OPENAI_API_KEY が設定されていません' },
-        { status: 500 },
-      );
-    }
-
-    const client = new OpenAI({ apiKey });
-
     const body = await req.json();
     const { content, studyTime, tasksCompleted } = body;
 
@@ -26,31 +18,45 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log('feedback input', { content, studyTime, tasksCompleted });
+
     const completion = await client.chat.completions.create({
       model: 'gpt-5-nano',
       messages: [
         {
           role: 'system',
           content:
-            'あなたは資格学習の日報に一言コメントするコーチです。やさしく短くコメントしてください。',
+            'あなたは学習コーチです。日報を読んで、優しく具体的なフィードバックを日本語で120文字程度で返してください。',
         },
         {
           role: 'user',
           content: `
-今日の学習内容: ${content}
+今日の学習内容:
+${content}
+
 学習時間: ${studyTime ?? '不明'} 時間
 完了タスク数: ${tasksCompleted ?? '不明'} 件
-        `.trim(),
+`,
         },
       ],
       max_completion_tokens: 200,
     });
 
-    const comment = completion.choices[0]?.message?.content ?? '';
+    const raw = completion.choices[0]?.message?.content;
 
-    return NextResponse.json({ comment });
-  } catch (e) {
-    console.error('feedback api error', e);
+    // content が string | null | Array のパターンがあるので一応ケア
+    let commentText = '';
+    if (typeof raw === 'string') {
+      commentText = raw;
+    } else if (Array.isArray(raw)) {
+      commentText = raw.map((p: any) => p.text ?? '').join('');
+    }
+
+    console.log('feedback comment', commentText);
+
+    return NextResponse.json({ comment: commentText });
+  } catch (err) {
+    console.error('feedback api error', err);
     return NextResponse.json(
       { error: 'AIコメント生成に失敗しました' },
       { status: 500 },
