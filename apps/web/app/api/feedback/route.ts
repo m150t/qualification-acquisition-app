@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     }
 
     const completion = await client.chat.completions.create({
-      model: 'gpt-5.1-mini', // ここは今使ってるモデルでOK
+      model: 'gpt-5-nano', // ここは今使ってるモデルでOK
       max_completion_tokens: 300,
       messages: [
         {
