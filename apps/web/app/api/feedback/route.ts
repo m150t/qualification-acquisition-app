@@ -6,42 +6,31 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// なんでもいいから「テキスト」に潰す関数
+// content が string でも配列でもオブジェクトでも、とにかく文字列に潰す保険関数
 function extractTextFromMessageContent(content: any): string {
+  if (!content) return '';
+
   // 1) ふつうの string
   if (typeof content === 'string') {
     return content;
   }
 
-  // 2) 配列（新APIのパーツ配列想定）
+  // 2) 配列（新仕様で [ { type: 'text', text: '...' }, ... ] 的なやつ）
   if (Array.isArray(content)) {
     return content
       .map((part: any) => {
         if (!part) return '';
 
-        // 純粋な string パーツ
         if (typeof part === 'string') return part;
 
-        // part.text が色んな形で入っている可能性を片っ端から潰す
-        const t = part.text;
-        if (!t) return '';
-
-        if (typeof t === 'string') return t;
-
-        // [{ text: '...' }, { text: '...' }] みたいなパターン
-        if (Array.isArray(t)) {
-          return t
-            .map((span: any) =>
-              typeof span === 'string'
-                ? span
-                : span?.text ?? '',
-            )
-            .join('');
+        // { type: 'text', text: '...' }
+        if (part.type === 'text' && typeof part.text === 'string') {
+          return part.text;
         }
 
-        // { value: '...' } みたいなパターン
-        if (typeof t === 'object' && t.value) {
-          return String(t.value);
+        // { text: '...' }
+        if (typeof part.text === 'string') {
+          return part.text;
         }
 
         return '';
@@ -49,15 +38,20 @@ function extractTextFromMessageContent(content: any): string {
       .join('');
   }
 
-  // 3) オブジェクト単体で来たとき
-  if (content && typeof content === 'object') {
-    const t = (content as any).text;
-    if (typeof t === 'string') return t;
-    if (t && typeof t === 'object' && 'value' in t) {
-      return String(t.value);
+  // 3) オブジェクト単体
+  if (typeof content === 'object') {
+    // { type: 'text', text: '...' }
+    if (
+      (content as any).type === 'text' &&
+      typeof (content as any).text === 'string'
+    ) {
+      return (content as any).text;
     }
 
-    // 最悪 JSON 文字列にして返す（空よりマシ）
+    if (typeof (content as any).text === 'string') {
+      return (content as any).text;
+    }
+
     try {
       return JSON.stringify(content);
     } catch {
@@ -83,7 +77,7 @@ export async function POST(req: Request) {
     }
 
     const completion = await client.chat.completions.create({
-      model: 'gpt-5.1-mini', // ここは使いたいモデルに合わせる
+      model: 'gpt-5.1-mini', // ここは今使ってるモデルでOK
       max_completion_tokens: 300,
       messages: [
         {
@@ -94,14 +88,10 @@ export async function POST(req: Request) {
         },
         {
           role: 'user',
-          content: [
-            {
-              type: 'output_text',
-              text: {
-                value: `今日の学習内容: ${content}\n学習時間: ${studyTime ?? '不明'}時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
-              },
-            },
-          ],
+          // ← ここを **ただの string** に戻す
+          content: `今日の学習内容: ${content}\n学習時間: ${
+            studyTime ?? '不明'
+          }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
         },
       ],
     });
@@ -111,7 +101,6 @@ export async function POST(req: Request) {
     let commentText = '';
 
     if (msg && 'content' in msg) {
-      // 型でゴネられるので any にキャストしてから専用関数に投げる
       const raw: any = (msg as any).content;
       commentText = extractTextFromMessageContent(raw);
     }
@@ -120,7 +109,6 @@ export async function POST(req: Request) {
     console.log('feedback comment', commentText);
 
     if (!commentText) {
-      // ここで完全に空なら、フロントで出してるメッセージと同じ文言を返す
       return NextResponse.json({
         comment:
           'コメントを取得できませんでした（content のパースに失敗しました）。',
