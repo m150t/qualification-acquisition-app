@@ -20,32 +20,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const completion = await client.chat.completions.create({
-      // ← ここを 4o-mini に変える
-      model: 'gpt-4o-mini',
-      // まずは max_* 系は一切指定しない（変に効いている可能性を消す）
-      messages: [
-        {
-          role: 'system',
-          content:
-            'あなたは資格学習を応援する優しいコーチです。' +
-            '学習内容を褒めつつ、「次に何をやると良いか」を1〜2個具体的に提案してください。' +
-            '丁寧だけどコンパクトに、200文字前後で日本語で答えてください。',
-        },
-        {
-          role: 'user',
-          content: `今日の学習内容: ${content}\n学習時間: ${
-            studyTime ?? '不明'
-          }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
-        },
-      ],
-    });
+const completion = await client.chat.completions.create({
+  model: "gpt-4.1-mini",
+  messages: [
+    {
+      role: "system",
+      content:
+        "ユーザーの勉強内容に対する励ましコメントを必ず返してください。空文字は禁止。"
+    },
+    {
+      role: "user",
+      content: `今日の学習内容: ${content}\n学習時間:${studyTime}\n完了タスク:${tasksCompleted}`
+    }
+  ]
+});
 
-    const msg = completion.choices[0]?.message;
-    const text = (msg?.content ?? '').toString();
+const msg = completion.choices?.[0]?.message;
+const commentText = msg?.content?.trim() || "今日もお疲れさま！よく頑張ったね。";
 
-    console.log('feedback raw message', JSON.stringify(msg, null, 2));
-    console.log('feedback comment', text);
+console.log("feedback raw message", msg);
+console.log("feedback comment", commentText);
 
     if (!text) {
       // 本当に空だったときだけ fallback
