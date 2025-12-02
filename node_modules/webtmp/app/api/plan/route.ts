@@ -41,7 +41,18 @@ const commentText = msg?.content?.trim() || "今日もお疲れさま！よく�
 console.log("feedback raw message", msg);
 console.log("feedback comment", commentText);
 
-    if (!text) {
+    if (console.log("feedback comment", commentText);
+
+if (!commentText) {
+  // 本当に空だったときだけ fallback
+  return NextResponse.json(
+    {
+      comment: 'コメントを取得できませんでした（content が空でした）。',
+    },
+    { status: 200 },
+  );
+}
+) {
       // 本当に空だったときだけ fallback
       return NextResponse.json({
         comment:
@@ -49,7 +60,7 @@ console.log("feedback comment", commentText);
       });
     }
 
-    return NextResponse.json({ comment: text });
+    return NextResponse.json({ comment:commentText  });
   } catch (e: any) {
     console.error('feedback api error', e);
     return NextResponse.json(
