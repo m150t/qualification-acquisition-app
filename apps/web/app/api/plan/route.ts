@@ -41,8 +41,6 @@ const commentText = msg?.content?.trim() || "今日もお疲れさま！よく�
 console.log("feedback raw message", msg);
 console.log("feedback comment", commentText);
 
-    if (console.log("feedback comment", commentText);
-
 if (!commentText) {
   // 本当に空だったときだけ fallback
   return NextResponse.json(
