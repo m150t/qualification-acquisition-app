@@ -1,69 +1,80 @@
-// app/api/feedback/route.ts
+// apps/web/app/api/plan/route.ts
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: process.env.OPENAI_API_KEY,
 });
+
+type GeneratePlanRequest = {
+  goal: {
+    certName: string;
+    examDate: string;      // YYYY-MM-DD
+    weeklyHours: number;   // 目標学習時間（時間）
+  };
+};
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { content, studyTime, tasksCompleted } = body;
+    const body = (await req.json()) as GeneratePlanRequest;
+    const { goal } = body;
 
-    console.log('feedback input', body, new Date().toISOString());
-
-    if (!content) {
+    if (!goal?.certName || !goal?.examDate) {
       return NextResponse.json(
-        { error: 'content がありません' },
+        { error: 'goal.certName と goal.examDate は必須です' },
         { status: 400 },
       );
     }
 
-const completion = await client.chat.completions.create({
-  model: "gpt-4.1-mini",
-  messages: [
-    {
-      role: "system",
-      content:
-        "ユーザーの勉強内容に対する励ましコメントを必ず返してください。空文字は禁止。"
-    },
-    {
-      role: "user",
-      content: `今日の学習内容: ${content}\n学習時間:${studyTime}\n完了タスク:${tasksCompleted}`
-    }
-  ]
-});
+    const prompt = `
+資格名: ${goal.certName}
+試験日: ${goal.examDate}
+目標の週あたり学習時間: ${goal.weeklyHours} 時間
 
-const msg = completion.choices?.[0]?.message;
-const commentText = msg?.content?.trim() || "今日もお疲れさま！よく頑張ったね。";
-
-console.log("feedback raw message", msg);
-console.log("feedback comment", commentText);
-
-if (!commentText) {
-  // 本当に空だったときだけ fallback
-  return NextResponse.json(
-    {
-      comment: 'コメントを取得できませんでした（content が空でした）。',
-    },
-    { status: 200 },
-  );
+上記をもとに、試験日までの学習計画を立ててください。
+レスポンスは必ず JSON 配列のみで返してください。各要素は以下の形式：
+{
+  "date": "YYYY-MM-DD",
+  "theme": "その日の学習テーマ",
+  "tasks": ["具体的なタスク1", "具体的なタスク2"]
 }
-) {
-      // 本当に空だったときだけ fallback
-      return NextResponse.json({
-        comment:
-          'コメントを取得できませんでした（content が空でした）。',
-      });
+`;
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4.1-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。',
+        },
+        { role: 'user', content: prompt },
+      ],
+    });
+
+    const msg = completion.choices[0]?.message;
+    let text = (msg?.content ?? '').toString().trim();
+
+    console.log('plan raw message', msg);
+
+    let plan: any[] = [];
+
+    try {
+      if (text) {
+        plan = JSON.parse(text);
+      }
+    } catch (e) {
+      console.error('failed to parse plan JSON', e, text);
+      // パース失敗時は空配列で返す
+      plan = [];
     }
 
-    return NextResponse.json({ comment:commentText  });
+    return NextResponse.json({ plan });
   } catch (e: any) {
-    console.error('feedback api error', e);
+    console.error('plan api error', e);
     return NextResponse.json(
       {
-        error: 'AIコメント生成に失敗しました',
+        error: '学習計画の生成に失敗しました',
         detail: e?.message ?? String(e),
       },
       { status: 500 },
