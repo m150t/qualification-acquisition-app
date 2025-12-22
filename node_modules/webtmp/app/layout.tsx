@@ -1,11 +1,9 @@
-// apps/web/app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import AuthLayout from "./AuthLayout"; // さっき作るやつを読み込む
 
 export const metadata: Metadata = {
   title: "StudyCoach",
-  description: "資格学習をサポートするアプリ",
+  description: "資格学習の計画と進捗をサポート",
 };
 
 export default function RootLayout({
@@ -15,9 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body>
-        <AuthLayout>{children}</AuthLayout>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
