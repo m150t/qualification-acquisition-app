@@ -50,12 +50,12 @@ export default function LandingPage() {
 
         <div style={{ marginTop: 48, display: "grid", gap: 16 }}>
           <Feature title="計画" desc="資格・期限から、学習の全体像を作る。" />
-          <Feature title="実行" desc="今日やることが迷わない。" />
+          <Feature title="実行" desc="今日やることを迷わない。" />
           <Feature title="記録" desc="進捗が見えるから、続く。" />
         </div>
 
         <div style={{ marginTop: 56, fontSize: 12, color: "#666" }}>
-          ※ 認証はログイン後に有効化されます（Cognito）。
+          ※ 現在、試験的に公開しています（ベータ版）。至らない点もありますが、順次改善していきます。
         </div>
       </div>
     </main>
