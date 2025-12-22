@@ -1,17 +1,20 @@
 // apps/web/src/components/DailyReport.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Input } from './ui/input';
-import { ChevronLeft, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useAuthenticator } from "@aws-amplify/ui-react";
+import { Card } from "./ui/card";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { Input } from "./ui/input";
+import { ChevronLeft, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function DailyReport() {
   const router = useRouter();
+  const { user } = useAuthenticator((context) => [context.user]);
+  const userId = user?.userId ?? user?.username ?? "";
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -26,6 +29,11 @@ export default function DailyReport() {
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    if (!userId) {
+      setFeedbackError('ユーザー情報の取得に失敗しました。再度ログインしてください。');
+      return;
+    }
+
     setFeedbackError(null);
     setIsSaving(true);
 
@@ -33,7 +41,10 @@ export default function DailyReport() {
       // ① 日報を DynamoDB に保存
       const reportRes = await fetch('/api/reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
         body: JSON.stringify({
           date,
           studyTime,
@@ -82,7 +93,7 @@ export default function DailyReport() {
       }
     } catch (e) {
       console.error('daily report save/feedback error', e);
-      setFeedbackError('通信エラーが発生しました。');
+      setFeedbackError('通信エラーが発生しました。もう一度お試しください。');
     } finally {
       setIsLoadingFeedback(false);
       setIsSaving(false);

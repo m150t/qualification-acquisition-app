@@ -6,6 +6,7 @@ import { Card } from './ui/card';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { ChevronLeft, Sparkles, Calendar, Check, Edit2 } from 'lucide-react';
+import { useAuthenticator } from '@aws-amplify/ui-react';
 
 import {
   CERTIFICATIONS,
@@ -89,6 +90,8 @@ function getTodayYmd(): string {
 export default function GoalSetting() {
   // ステップ
   const [step, setStep] = useState(1);
+  const { user } = useAuthenticator((context) => [context.user]);
+  const userId = user?.userId ?? user?.username ?? '';
 
   // 資格関連
   const [selectedCertCode, setSelectedCertCode] = useState<string>('aws-saa');
@@ -209,6 +212,11 @@ export default function GoalSetting() {
 
   // ==== 保存 ====
   const handleSavePlan = async () => {
+    if (!userId) {
+      alert('ユーザー情報の取得に失敗しました。再度ログインしてください。');
+      return;
+    }
+
     const numericWeeklyHours =
       weeklyHours === '' ? null : Number(weeklyHours) || null;
 
@@ -241,21 +249,24 @@ export default function GoalSetting() {
     try {
       const res = await fetch('/api/goals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error('save error', err);
-        alert('目標の保存に失敗しました');
+        alert('目標の保存に失敗しました。時間をおいて再度お試しください。');
         return;
       }
 
-      alert('目標を保存しました！（バックエンド連携はあとで本実装）');
+      alert('目標を保存しました！');
     } catch (e) {
       console.error(e);
-      alert('通信エラーで保存に失敗しました');
+      alert('通信エラーで保存に失敗しました。接続状況を確認して再度お試しください。');
     }
   };
 
