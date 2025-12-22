@@ -19,7 +19,7 @@ export default function Page() {
         break;
       case 'home':
       default:
-        router.push('/app'); // ★ここ重要
+        router.push('/app'); 
         break;
     }
   };
