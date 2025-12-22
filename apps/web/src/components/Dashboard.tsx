@@ -556,7 +556,7 @@ export default function Dashboard() {
         <div className="mx-auto flex h-14 max-w-md items-center justify-around text-xs">
           <button
             className="flex flex-col items-center text-blue-600"
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/app')}
           >
             <span>ホーム</span>
           </button>
