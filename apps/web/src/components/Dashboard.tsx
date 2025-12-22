@@ -1,11 +1,12 @@
 // src/components/Dashboard.tsx
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { Progress } from './ui/progress';
+import { useEffect, useMemo, useState } from "react";
+import { useAuthenticator } from "@aws-amplify/ui-react";
+import { useRouter } from "next/navigation";
+import { Card } from "./ui/card";
+import { Button } from "./ui/button";
+import { Progress } from "./ui/progress";
 import {
   Calendar,
   Sparkles,
@@ -53,10 +54,14 @@ function makeDateKey(d: Date): string {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { user } = useAuthenticator((context) => [context.user]);
+  const userId = user?.userId ?? user?.username ?? '';
 
   const [goal, setGoal] = useState<StudyGoal | null>(null);
   const [tasks, setTasks] = useState<UiTask[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isProcessingResult, setIsProcessingResult] = useState(false);
 
   // 「今日」のキー（0:00固定）
   const todayDate = useMemo(() => {
@@ -71,9 +76,18 @@ export default function Dashboard() {
   // -----------------------------
   useEffect(() => {
     const fetchAll = async () => {
+      if (!userId) {
+        setGoal(null);
+        setTasks([]);
+        setReports([]);
+        return;
+      }
+
       // 1. 目標＋計画
       try {
-        const goalRes = await fetch('/api/goals');
+        const goalRes = await fetch('/api/goals', {
+          headers: { 'x-user-id': userId },
+        });
         if (goalRes.ok) {
           const data = await goalRes.json();
           // 期待する形：
@@ -115,7 +129,9 @@ export default function Dashboard() {
 
       // 2. 日報一覧
       try {
-        const repRes = await fetch('/api/reports');
+        const repRes = await fetch('/api/reports', {
+          headers: { 'x-user-id': userId },
+        });
         if (repRes.ok) {
           const data = await repRes.json();
           if (Array.isArray(data.reports)) {
@@ -130,7 +146,7 @@ export default function Dashboard() {
     };
 
     fetchAll();
-  }, [todayKey]);
+  }, [todayKey, userId]);
 
   // 日付ごと「勉強したか」
   const dateHasStudy = useMemo(() => {
@@ -166,14 +182,17 @@ export default function Dashboard() {
     );
     const diffMs = examDateOnly.getTime() - todayDate.getTime();
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return 0;
     return diffDays;
   }, [goal, todayDate]);
+
+  const displayDaysUntilExam =
+    daysUntilExam == null ? null : Math.max(0, daysUntilExam);
+  const isExamOver = daysUntilExam != null && daysUntilExam < 0;
 
   // 連続日数（今日からさかのぼり）
   const streakDays = useMemo(() => {
     let count = 0;
-    let d = new Date(todayDate);
+    const d = new Date(todayDate);
 
     while (true) {
       const key = makeDateKey(d);
@@ -223,7 +242,7 @@ export default function Dashboard() {
 
   // ざっくり学習進捗
   const totalProgress = useMemo(() => {
-    if (!goal?.weeklyHours || !daysUntilExam || daysUntilExam <= 0) {
+    if (!goal?.weeklyHours || daysUntilExam == null || daysUntilExam <= 0) {
       return 0;
     }
 
@@ -251,6 +270,59 @@ export default function Dashboard() {
     return 'こんばんは';
   }, []);
 
+  const handleShowResult = () => {
+    setStatusMessage(null);
+  };
+
+  const clearUserData = async () => {
+    if (!userId) return;
+    await fetch('/api/goals', {
+      method: 'DELETE',
+      headers: { 'x-user-id': userId },
+    }).catch((e) => console.error('failed to delete goal', e));
+
+    await fetch('/api/reports', {
+      method: 'DELETE',
+      headers: { 'x-user-id': userId },
+    }).catch((e) => console.error('failed to delete reports', e));
+  };
+
+  const handlePassed = async () => {
+    if (!userId) {
+      alert('ユーザー情報の取得に失敗しました。再度ログインしてください。');
+      return;
+    }
+    if (
+      !window.confirm(
+        '合格おめでとうございます！この試験に関するデータを削除します。よろしいですか？',
+      )
+    ) {
+      return;
+    }
+
+    setIsProcessingResult(true);
+    setStatusMessage(null);
+    try {
+      await clearUserData();
+      setGoal(null);
+      setTasks([]);
+      setReports([]);
+      setStatusMessage(
+        'データを削除しました。次の目標を設定して新しい学習を始めましょう。',
+      );
+    } catch (e) {
+      console.error('failed to process pass result', e);
+      alert('処理中にエラーが発生しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsProcessingResult(false);
+    }
+  };
+
+  const handleReschedule = () => {
+    setStatusMessage('次の試験日を設定して、新しい計画を作成しましょう。');
+    router.push('/goal');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* ===== Header ===== */}
@@ -273,17 +345,19 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm text-blue-100">{goal.certName}</p>
                   <div className="mt-1 flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-white" />
-                    <p className="text-white">{goal.examDate}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl text-white">{daysUntilExam ?? '―'}</p>
-                  <p className="text-sm text-blue-100">日</p>
+                  <Calendar className="h-4 w-4 text-white" />
+                  <p className="text-white">{goal.examDate}</p>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
+              <div className="text-right">
+                <p className="text-2xl text-white">
+                  {displayDaysUntilExam ?? '―'}
+                </p>
+                <p className="text-sm text-blue-100">日</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
                   <span className="text-blue-100">学習進捗</span>
                   <span className="text-white">{totalProgress}%</span>
                 </div>
@@ -292,10 +366,18 @@ export default function Dashboard() {
             </Card>
           ) : (
             <Card className="border-white/20 bg-white/10 p-4 backdrop-blur-sm">
-              <p className="text-sm text-blue-50">
-                まだ目標が設定されていません。
-                「目標」タブから試験日と資格を設定すると、ここに情報が表示されます。
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-blue-50">
+                  まだ目標が設定されていません。目標を設定して学習を開始しましょう。
+                </p>
+                <Button
+                  size="sm"
+                  className="bg-white text-blue-700 hover:bg-blue-50"
+                  onClick={() => router.push('/goal')}
+                >
+                  目標を設定する
+                </Button>
+              </div>
             </Card>
           )}
         </div>
@@ -345,6 +427,45 @@ export default function Dashboard() {
             </div>
           )}
         </Card>
+
+        {/* 試験結果入力（試験日を過ぎたとき） */}
+        {isExamOver && (
+          <Card className="border-red-200 bg-red-50 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-gray-900">試験結果を教えてください</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleShowResult}
+                disabled={isProcessingResult}
+              >
+                更新
+              </Button>
+            </div>
+            <p className="text-sm text-gray-700">
+              試験日を過ぎています。結果を選択してください。
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Button
+                className="bg-green-600 text-white hover:bg-green-700"
+                onClick={handlePassed}
+                disabled={isProcessingResult}
+              >
+                合格した（データを削除）
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleReschedule}
+                disabled={isProcessingResult}
+              >
+                試験日を再設定する
+              </Button>
+            </div>
+            {statusMessage && (
+              <p className="mt-3 text-sm text-gray-700">{statusMessage}</p>
+            )}
+          </Card>
+        )}
 
         {/* 日報 CTA */}
         <Card className="border-blue-200 bg-gradient-to-br from-indigo-50 to-blue-50 p-4">

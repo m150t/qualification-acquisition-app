@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAuthenticator } from '@aws-amplify/ui-react';
 
 const weekDays = ['月', '火', '水', '木', '金', '土', '日'];
 const monthDays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -31,12 +32,22 @@ export default function CalendarView() {
     totalHours: 0,
     achievementRate: 0,
   });
+  const { user } = useAuthenticator((context) => [context.user]);
+  const userId = user?.userId ?? user?.username ?? '';
 
   // 🔁 /api/reports から日報を取得して集計
   useEffect(() => {
     const fetchReports = async () => {
+      if (!userId) {
+        setStudyData({});
+        setMonthlyStats({ daysCompleted: 0, totalHours: 0, achievementRate: 0 });
+        return;
+      }
+
       try {
-        const res = await fetch('/api/reports');
+        const res = await fetch('/api/reports', {
+          headers: { 'x-user-id': userId },
+        });
         if (!res.ok) {
           console.error('failed to load /api/reports', await res.text());
           setStudyData({});
@@ -108,7 +119,7 @@ export default function CalendarView() {
     };
 
     fetchReports();
-  }, [currentDate]);
+  }, [currentDate, userId]);
 
   const getWeekDates = () => {
     const dates: Date[] = [];

@@ -1,18 +1,33 @@
 // apps/web/app/api/goals/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb } from '@/src/lib/dynamodb';
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || 'StudyGoals';
-const DEMO_USER_ID = 'demo-user'; // 認証入るまでの仮
+
+function getUserId(req: NextRequest) {
+  const userId = req.headers.get('x-user-id');
+  if (!userId) {
+    return null;
+  }
+  return userId;
+}
 
 // POST: 目標＋日付ベースの計画を保存
 export async function POST(req: NextRequest) {
   try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'userId header is required' },
+        { status: 401 },
+      );
+    }
+
     const body = await req.json();
 
     const item = {
-      userId: DEMO_USER_ID,
+      userId,
       certCode: body.certCode ?? null,
       certName: body.certName ?? null,
       examDate: body.examDate ?? null,
@@ -41,12 +56,20 @@ export async function POST(req: NextRequest) {
 }
 
 // GET: 目標＋計画を取得
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'userId header is required' },
+        { status: 401 },
+      );
+    }
+
     const res = await ddb.send(
       new GetCommand({
         TableName: GOALS_TABLE,
-        Key: { userId: DEMO_USER_ID },
+        Key: { userId },
       }),
     );
 
@@ -63,6 +86,34 @@ export async function GET() {
     console.error('goals GET error', e);
     return NextResponse.json(
       { error: 'failed to load goal' },
+      { status: 500 },
+    );
+  }
+}
+
+// DELETE: 目標と計画を削除（試験終了後のリセット用途）
+export async function DELETE(req: NextRequest) {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'userId header is required' },
+        { status: 401 },
+      );
+    }
+
+    await ddb.send(
+      new DeleteCommand({
+        TableName: GOALS_TABLE,
+        Key: { userId },
+      }),
+    );
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('goals DELETE error', e);
+    return NextResponse.json(
+      { error: 'failed to delete goal' },
       { status: 500 },
     );
   }

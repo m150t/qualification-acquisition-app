@@ -31,21 +31,18 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         },
       }}
     >
-      {({ user, signOut }) => (
+      {({ signOut }) => (
         <>
           {/* 🔽 ログイン済みのときだけここが表示される */}
           <header
             style={{
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent: "flex-end",
               alignItems: "center",
               padding: "12px 24px",
               borderBottom: "1px solid #eee",
             }}
           >
-            <span style={{ fontSize: "14px" }}>
-              ログイン中: {user?.username}
-            </span>
             <button
               onClick={signOut}
               style={{
