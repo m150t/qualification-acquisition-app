@@ -43,14 +43,17 @@ export async function POST(req: NextRequest) {
         ? null
         : Number(body.tasksCompleted);
 
+    const savedAt = new Date().toISOString();
+
     const item = {
       userId,
-      date,
+      date: `${date}#${savedAt}`,
+      reportDate: date,
       studyTime,
       tasksCompleted,
       content: body.content ?? '',
       aiComment: body.aiComment ?? null,
-      savedAt: new Date().toISOString(),
+      savedAt,
     };
 
     await ddb.send(
@@ -94,7 +97,19 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    const reports = res.Items ?? [];
+    const reports = (res.Items ?? []).map((item) => {
+      const baseDate =
+        typeof item.reportDate === 'string'
+          ? item.reportDate
+          : typeof item.date === 'string'
+            ? item.date.split('#')[0] ?? item.date
+            : '';
+
+      return {
+        ...item,
+        date: baseDate,
+      };
+    });
 
     return NextResponse.json({ reports });
   } catch (e) {

@@ -110,6 +110,8 @@ export default function GoalSetting() {
   const [plan, setPlan] = useState<DayPlan[]>([]);
   const [showPlan, setShowPlan] = useState(false);
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
+  const [existingGoal, setExistingGoal] = useState<StudyGoal | null>(null);
+  const [isLoadingGoal, setIsLoadingGoal] = useState(false);
 
   // 選択中資格
   const selectedCert =
@@ -138,6 +140,47 @@ export default function GoalSetting() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examDate]);
+
+  // 既存の目標取得
+  useEffect(() => {
+    const loadGoal = async () => {
+      if (!userId) {
+        setExistingGoal(null);
+        return;
+      }
+
+      try {
+        setIsLoadingGoal(true);
+        const res = await fetch('/api/goals', {
+          headers: { 'x-user-id': userId },
+        });
+
+        if (!res.ok) {
+          console.error('failed to load goal', await res.text());
+          setExistingGoal(null);
+          return;
+        }
+
+        const data = await res.json();
+        if (data.goal) {
+          setExistingGoal({
+            certName: data.goal.certName,
+            examDate: data.goal.examDate,
+            weeklyHours: data.goal.weeklyHours ?? null,
+          });
+        } else {
+          setExistingGoal(null);
+        }
+      } catch (error) {
+        console.error('load goal error', error);
+        setExistingGoal(null);
+      } finally {
+        setIsLoadingGoal(false);
+      }
+    };
+
+    loadGoal();
+  }, [userId]);
 
   // ==== 計画生成（日付ベース） ====
   const handleGeneratePlan = () => {
@@ -217,6 +260,15 @@ export default function GoalSetting() {
       return;
     }
 
+    if (
+      existingGoal &&
+      !window.confirm(
+        'すでに目標が設定されています。新しい内容で上書きしてもよろしいですか？',
+      )
+    ) {
+      return;
+    }
+
     const numericWeeklyHours =
       weeklyHours === '' ? null : Number(weeklyHours) || null;
 
@@ -263,6 +315,7 @@ export default function GoalSetting() {
         return;
       }
 
+      setExistingGoal(goalPayload);
       alert('目標を保存しました！');
     } catch (e) {
       console.error(e);
@@ -302,6 +355,33 @@ export default function GoalSetting() {
       </header>
 
       <div className="space-y-4 p-4">
+        {existingGoal && (
+          <Card className="border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">
+              現在、進行中の目標があります
+            </p>
+            <div className="mt-2 space-y-1 text-sm text-amber-800">
+              <p>資格: {existingGoal.certName || '未設定'}</p>
+              <p>試験日: {existingGoal.examDate || '未設定'}</p>
+              <p>
+                推奨学習時間:{" "}
+                {existingGoal.weeklyHours != null
+                  ? `週${existingGoal.weeklyHours}時間`
+                  : '未設定'}
+              </p>
+              <p className="mt-2 text-xs">
+                新しい目標を保存すると、この内容が上書きされます。
+              </p>
+            </div>
+          </Card>
+        )}
+
+        {!existingGoal && isLoadingGoal && (
+          <Card className="p-4">
+            <p className="text-sm text-gray-700">現在の目標を読み込み中です…</p>
+          </Card>
+        )}
+
         {/* ステップインジケータ（計画表示時は非表示） */}
         {!showPlan && (
           <div className="mb-6 flex items-center justify-center gap-2">
@@ -656,6 +736,13 @@ export default function GoalSetting() {
                 </Card>
               ))}
             </div>
+
+            {existingGoal && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                すでに登録済みの目標があるため、保存すると上書きされます。
+                内容を確認してから進めてください。
+              </div>
+            )}
 
             <Button
               onClick={handleSavePlan}

@@ -53,15 +53,18 @@ export async function POST(req: Request) {
     });
 
     const msg = completion.choices[0]?.message;
-    let text = (msg?.content ?? '').toString().trim();
+    const text = (msg?.content ?? '').toString().trim();
 
     console.log('plan raw message', msg);
 
-    let plan: any[] = [];
+    let plan: Array<Record<string, unknown>> = [];
 
     try {
       if (text) {
-        plan = JSON.parse(text);
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          plan = parsed as Array<Record<string, unknown>>;
+        }
       }
     } catch (e) {
       console.error('failed to parse plan JSON', e, text);
@@ -70,12 +73,12 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ plan });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('plan api error', e);
     return NextResponse.json(
       {
         error: '学習計画の生成に失敗しました',
-        detail: e?.message ?? String(e),
+        detail: e instanceof Error ? e.message : String(e),
       },
       { status: 500 },
     );

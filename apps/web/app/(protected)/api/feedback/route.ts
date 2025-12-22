@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/feedback/route.ts
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -24,13 +25,28 @@ function extractTextFromMessageContent(content: any): string {
         if (typeof part === 'string') return part;
 
         // { type: 'text', text: '...' }
-        if (part.type === 'text' && typeof part.text === 'string') {
+        if (
+          (part.type === 'text' || part.type === 'output_text') &&
+          typeof part.text === 'string'
+        ) {
           return part.text;
         }
 
         // { text: '...' }
         if (typeof part.text === 'string') {
           return part.text;
+        }
+
+        // { text: [ { text: '...' } ] }
+        if (Array.isArray(part.text)) {
+          return part.text
+            .map((t: any) => {
+              if (!t) return '';
+              if (typeof t === 'string') return t;
+              if (typeof t.text === 'string') return t.text;
+              return '';
+            })
+            .join('');
         }
 
         return '';
@@ -50,6 +66,17 @@ function extractTextFromMessageContent(content: any): string {
 
     if (typeof (content as any).text === 'string') {
       return (content as any).text;
+    }
+
+    if (Array.isArray((content as any).text)) {
+      return (content as any).text
+        .map((t: any) => {
+          if (!t) return '';
+          if (typeof t === 'string') return t;
+          if (typeof t.text === 'string') return t.text;
+          return '';
+        })
+        .join('');
     }
 
     try {

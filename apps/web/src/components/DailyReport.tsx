@@ -105,7 +105,7 @@ export default function DailyReport() {
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div className="flex h-14 items-center px-4">
-          <button onClick={() => router.push('/')} className="mr-3">
+          <button onClick={() => router.push('/app')} className="mr-3">
             <ChevronLeft className="h-6 w-6 text-gray-700" />
           </button>
           <h1 className="text-gray-900">日報</h1>
