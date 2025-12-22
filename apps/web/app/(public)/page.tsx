@@ -5,7 +5,7 @@ export default function LandingPage() {
     <main style={{ minHeight: "100vh", padding: "64px 24px" }}>
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em" }}>
-          StudyCoach
+          QUALog -試験対策の設計支援と伴走
         </h1>
 
         <p style={{ marginTop: 16, fontSize: 18, lineHeight: 1.7 }}>
