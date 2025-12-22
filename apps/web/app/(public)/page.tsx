@@ -56,6 +56,7 @@ export default function LandingPage() {
 
         <div style={{ marginTop: 56, fontSize: 12, color: "#666" }}>
           ※ 現在、試験的に公開しています（ベータ版）。至らない点もありますが、順次改善していきます。
+          　 お問合せ先：https://forms.gle/GwcLWTGeKGwLwdkC9
         </div>
       </div>
     </main>
