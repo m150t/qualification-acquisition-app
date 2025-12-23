@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Providers from './Providers';
 
 export const metadata: Metadata = {
-  title: "StudyCoach",
+  title: "QUALog",
   description: "資格学習の計画と進捗をサポート",
 };
 
