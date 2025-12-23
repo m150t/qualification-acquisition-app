@@ -1,7 +1,7 @@
 'use client';
 
 import { Amplify } from 'aws-amplify';
-import outputs from '../amplify_outputs.json'; // ← パスはあとで合わせる
+import outputs from '../amplify_outputs.json';
 import { useEffect } from 'react';
 
 let configured = false;
