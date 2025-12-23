@@ -7,6 +7,34 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+// Responses API の output からテキストを抜き出す
+function extractTextFromResponseOutput(output: any): string {
+  if (!Array.isArray(output)) return '';
+
+  return output
+    .map((block: any) => {
+      if (!block?.content || !Array.isArray(block.content)) return '';
+
+      return block.content
+        .map((part: any) => {
+          if (!part) return '';
+          if (
+            (part.type === 'output_text' || part.type === 'text') &&
+            typeof part.text === 'string'
+          ) {
+            return part.text;
+          }
+          if (typeof part.text === 'string') {
+            return part.text;
+          }
+          return '';
+        })
+        .join('');
+    })
+    .join('')
+    .trim();
+}
+
 // content が string でも配列でもオブジェクトでも、とにかく文字列に潰す保険関数
 function extractTextFromMessageContent(content: any): string {
   if (!content) return '';
@@ -103,36 +131,79 @@ export async function POST(req: Request) {
       );
     }
 
-    const completion = await client.chat.completions.create({
-      model: 'gpt-5-nano', // ここは今使ってるモデルでOK
-      max_completion_tokens: 300,
-      messages: [
+    const response = await client.responses.create({
+      model: 'gpt-5-nano',
+      max_output_tokens: 300,
+      input: [
         {
           role: 'system',
-          content:
-            'あなたは資格学習を応援する優しいコーチです。' +
-            '学習内容を褒めつつ、「次に何をやると良いか」を1〜2個具体的に提案してください。',
+          content: [
+            {
+              type: 'input_text',
+              text:
+                'あなたは資格学習を応援する優しいコーチです。' +
+                '学習内容を褒めつつ、「次に何をやると良いか」を1〜2個具体的に提案してください。',
+            },
+          ],
         },
         {
           role: 'user',
-          // ← ここを **ただの string** に戻す
-          content: `今日の学習内容: ${content}\n学習時間: ${
-            studyTime ?? '不明'
-          }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
+          content: [
+            {
+              type: 'input_text',
+              text: `今日の学習内容: ${content}\n学習時間: ${
+                studyTime ?? '不明'
+              }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
+            },
+          ],
         },
       ],
     });
 
-    const msg = completion.choices[0]?.message;
+    let commentText =
+      (response as any).output_text ??
+      extractTextFromResponseOutput((response as any).output);
 
-    let commentText = '';
-
-    if (msg && 'content' in msg) {
-      const raw: any = (msg as any).content;
-      commentText = extractTextFromMessageContent(raw);
+    if (commentText) {
+      commentText = commentText.trim();
     }
 
-    console.log('feedback raw message', JSON.stringify(msg, null, 2));
+    // 念のため旧 chat.completions でのパースも保険として残す
+    if (!commentText) {
+      const completion = await client.chat.completions.create({
+        model: 'gpt-5-nano',
+        max_tokens: 300,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'あなたは資格学習を応援する優しいコーチです。' +
+              '学習内容を褒めつつ、「次に何をやると良いか」を1〜2個具体的に提案してください。',
+          },
+          {
+            role: 'user',
+            content: `今日の学習内容: ${content}\n学習時間: ${
+              studyTime ?? '不明'
+            }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
+          },
+        ],
+      });
+
+      const msg = completion.choices[0]?.message;
+      if (msg && 'content' in msg) {
+        commentText = extractTextFromMessageContent(
+          (msg as any).content as any,
+        );
+      }
+
+      console.log('feedback fallback raw message', JSON.stringify(msg, null, 2));
+    }
+
+    if (commentText) {
+      commentText = commentText.trim();
+    }
+
+    console.log('feedback raw response', JSON.stringify(response, null, 2));
     console.log('feedback comment', commentText);
 
     if (!commentText) {
