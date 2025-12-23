@@ -37,13 +37,21 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           <header
             style={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "space-between",
               alignItems: "center",
               padding: "12px 24px",
               borderBottom: "1px solid #eee",
             }}
           >
-            QUALog
+            <span
+              style={{
+              fontSize: "18px",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              }}
+            >
+              QUA<span style={{ color: "#666" }}>Log</span>
+            </span>
             <button
               onClick={signOut}
               style={{
