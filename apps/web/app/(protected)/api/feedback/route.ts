@@ -172,7 +172,7 @@ export async function POST(req: Request) {
     if (!commentText) {
       const completion = await client.chat.completions.create({
         model: 'gpt-5-nano',
-        max_tokens: 300,
+        max_completion_tokens: 300,
         messages: [
           {
             role: 'system',
