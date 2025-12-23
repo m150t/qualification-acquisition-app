@@ -43,6 +43,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               borderBottom: "1px solid #eee",
             }}
           >
+            QUALog
             <button
               onClick={signOut}
               style={{
