@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           return (
             <div style={{ padding: "24px", textAlign: "center" }}>
               <h1 style={{ fontSize: "24px", fontWeight: "bold" }}>
-                StudyCoach
+                QUALog 
               </h1>
               <p style={{ marginTop: "8px", fontSize: "14px" }}>
                 資格学習の計画を立てて、毎日の進捗を記録できます。
