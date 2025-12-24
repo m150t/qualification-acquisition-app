@@ -131,49 +131,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const response = await client.responses.create({
-      model: 'gpt-5-nano',
-      max_output_tokens: 300,
-      input: [
-        {
-          role: 'system',
-          content: [
-            {
-              type: 'input_text',
-              text:
-                'あなたは資格学習を応援する優しいコーチです。' +
-                '学習内容を褒めつつ、「次に何をやると良いか」を1〜2個具体的に提案してください。',
-            },
-          ],
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: `今日の学習内容: ${content}\n学習時間: ${
-                studyTime ?? '不明'
-              }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
-            },
-          ],
-        },
-      ],
-    });
-
-    let commentText =
-      (response as any).output_text ??
-      extractTextFromResponseOutput((response as any).output);
-
-    if (commentText) {
-      commentText = commentText.trim();
-    }
-
-    // 念のため旧 chat.completions でのパースも保険として残す
-    if (!commentText) {
-      const completion = await client.chat.completions.create({
-        model: 'gpt-5-nano',
-        max_completion_tokens: 300,
-        messages: [
+    const completion = await client.chat.completions.create({
+      model: "gpt-4.1-mini",
+      max_completion_tokens: 300,
+      messages: [
           {
             role: 'system',
             content:
@@ -186,25 +147,12 @@ export async function POST(req: Request) {
               studyTime ?? '不明'
             }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
           },
-        ],
-      });
+      ],
+    });
 
-      const msg = completion.choices[0]?.message;
-      if (msg && 'content' in msg) {
-        commentText = extractTextFromMessageContent(
-          (msg as any).content as any,
-        );
-      }
-
-      console.log('feedback fallback raw message', JSON.stringify(msg, null, 2));
-    }
-
-    if (commentText) {
-      commentText = commentText.trim();
-    }
-
-    console.log('feedback raw response', JSON.stringify(response, null, 2));
-    console.log('feedback comment', commentText);
+    const msg = completion.choices[0]?.message;
+    console.log("feedback raw", JSON.stringify(completion, null, 2));
+    const commentText = msg?.content?.trim();
 
     if (!commentText) {
       return NextResponse.json({
