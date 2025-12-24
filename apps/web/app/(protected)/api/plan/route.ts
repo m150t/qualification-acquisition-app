@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     const prompt = `
 資格名: ${goal.certName}
 試験日: ${goal.examDate}
-目標の週あたり学習時間: ${goal.weeklyHours ?? '未設定'} 時間
+目標の学習時間: ${goal.weeklyHours ?? '未設定'} 時間
 ${examGuideSection}
 
 上記をもとに、試験日までの学習計画を立ててください。
