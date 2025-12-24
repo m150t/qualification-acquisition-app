@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Label } from './ui/label';
@@ -9,8 +9,9 @@ import { ChevronLeft, Sparkles, Calendar, Check, Edit2 } from 'lucide-react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 
 import {
-  CERTIFICATIONS,
+  FALLBACK_CERTIFICATIONS,
   getPlanTemplateForCert,
+  type Certification,
   type WeeklyPlan,
 } from '@/src/lib/certifications';
 
@@ -87,6 +88,95 @@ function getTodayYmd(): string {
   return `${year}-${month}-${day}`;
 }
 
+type ApiPlanItem = {
+  date?: string;
+  theme?: string;
+  tasks?: string[];
+  topics?: string[];
+};
+
+function normalizePlanItems(items: ApiPlanItem[]): DayPlan[] {
+  return items
+    .map((item, index) => {
+      if (!item.date || !item.theme) return null;
+      const rawTopics = Array.isArray(item.tasks)
+        ? item.tasks
+        : Array.isArray(item.topics)
+          ? item.topics
+          : [];
+      const topics = rawTopics.map((t) => String(t)).filter(Boolean);
+      return {
+        dayIndex: index + 1,
+        date: item.date,
+        theme: item.theme,
+        topics: topics.length > 0 ? topics : ['学習内容を追加してください'],
+      };
+    })
+    .filter((item): item is DayPlan => item !== null);
+}
+
+function buildFallbackPlan(examDate: string, certCode: string): DayPlan[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const exam = parseYmd(examDate);
+  if (!exam) return [];
+
+  const diffMs = exam.getTime() - today.getTime();
+  const diffDaysRaw = diffMs / MS_PER_DAY;
+  const totalDays = Math.max(1, Math.ceil(diffDaysRaw));
+
+  const weeklyTemplate: WeeklyPlan[] =
+    getPlanTemplateForCert(certCode) ?? [
+      {
+        week: 1,
+        theme: 'Week 1 の学習内容',
+        topics: ['公式テキストを読み始める', '出題範囲の全体像を把握する'],
+      },
+    ];
+
+  type FlatTask = { theme: string; topic: string };
+  const flatTasks: FlatTask[] = [];
+  weeklyTemplate.forEach((w) => {
+    w.topics.forEach((t) => {
+      flatTasks.push({ theme: w.theme, topic: t });
+    });
+  });
+
+  const totalTasks = flatTasks.length;
+  const tasksPerDay = Math.max(1, Math.ceil(totalTasks / totalDays));
+
+  const newPlan: DayPlan[] = [];
+
+  for (let i = 0; i < totalDays; i++) {
+    const date = new Date(today.getTime() + i * MS_PER_DAY);
+    const dateStr = toDateOnlyString(date);
+
+    const startIndex = i * tasksPerDay;
+    const dayTasks = flatTasks.slice(startIndex, startIndex + tasksPerDay);
+
+    let theme: string;
+    let topics: string[];
+
+    if (dayTasks.length > 0) {
+      theme = dayTasks[0].theme;
+      topics = dayTasks.map((t) => t.topic);
+    } else {
+      theme = '予備日・復習';
+      topics = ['これまでの内容の復習', '模試や問題演習'];
+    }
+
+    newPlan.push({
+      dayIndex: i + 1,
+      date: dateStr,
+      theme,
+      topics,
+    });
+  }
+
+  return newPlan;
+}
+
 export default function GoalSetting() {
   // ステップ
   const [step, setStep] = useState(1);
@@ -96,6 +186,8 @@ export default function GoalSetting() {
   // 資格関連
   const [selectedCertCode, setSelectedCertCode] = useState<string>('aws-saa');
   const [customCertName, setCustomCertName] = useState('');
+  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [isLoadingCertifications, setIsLoadingCertifications] = useState(false);
 
   // 試験日
   const [examDate, setExamDate] = useState(getTodayYmd());
@@ -112,14 +204,25 @@ export default function GoalSetting() {
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
   const [existingGoal, setExistingGoal] = useState<StudyGoal | null>(null);
   const [isLoadingGoal, setIsLoadingGoal] = useState(false);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+
+  const availableCertifications = useMemo(
+    () => (certifications.length > 0 ? certifications : FALLBACK_CERTIFICATIONS),
+    [certifications],
+  );
 
   // 選択中資格
   const selectedCert =
-    CERTIFICATIONS.find((c) => c.code === selectedCertCode) ?? CERTIFICATIONS[0];
+    availableCertifications.find((c) => c.code === selectedCertCode) ??
+    availableCertifications[0];
+
+  const trimmedCustomCertName = customCertName.trim();
+  const effectiveCertName =
+    selectedCertCode === 'other' ? trimmedCustomCertName : selectedCert.name;
 
   const displayCertName =
     selectedCertCode === 'other'
-      ? customCertName || '（資格名を入力してください）'
+      ? trimmedCustomCertName || '（資格名を入力してください）'
       : selectedCert.name;
 
   // 実際の表示用：計画ができていれば plan から週数を出す
@@ -132,14 +235,46 @@ export default function GoalSetting() {
   useEffect(() => {
     const w = calcWeeksUntilExam(examDate);
     setWeeksUntilExam(w);
+  }, [examDate]);
 
+  useEffect(() => {
+    if (availableCertifications.length === 0) return;
+    if (!availableCertifications.some((c) => c.code === selectedCertCode)) {
+      setSelectedCertCode(availableCertifications[0].code);
+    }
+  }, [availableCertifications, selectedCertCode]);
+
+  useEffect(() => {
     // 資格マスタに defaultWeeklyHours があるなら設定（初期のみ）
-    const cert = CERTIFICATIONS.find((c) => c.code === selectedCertCode);
+    const cert = availableCertifications.find((c) => c.code === selectedCertCode);
     if (cert?.defaultWeeklyHours && weeklyHours === '') {
       setWeeklyHours(String(cert.defaultWeeklyHours));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examDate]);
+  }, [availableCertifications, selectedCertCode, weeklyHours]);
+
+  // 資格マスタを取得
+  useEffect(() => {
+    const loadCertifications = async () => {
+      try {
+        setIsLoadingCertifications(true);
+        const res = await fetch('/api/certifications');
+        if (!res.ok) {
+          console.error('failed to load certifications', await res.text());
+          return;
+        }
+        const data = await res.json();
+        if (Array.isArray(data.certifications) && data.certifications.length > 0) {
+          setCertifications(data.certifications);
+        }
+      } catch (error) {
+        console.error('load certifications error', error);
+      } finally {
+        setIsLoadingCertifications(false);
+      }
+    };
+
+    loadCertifications();
+  }, []);
 
   // 既存の目標取得
   useEffect(() => {
@@ -183,9 +318,11 @@ export default function GoalSetting() {
   }, [userId]);
 
   // ==== 計画生成（日付ベース） ====
-  const handleGeneratePlan = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const handleGeneratePlan = async () => {
+    if (selectedCertCode === 'other' && !trimmedCustomCertName) {
+      alert('資格名を入力してください。');
+      return;
+    }
 
     const exam = parseYmd(examDate);
     if (!exam) {
@@ -193,68 +330,66 @@ export default function GoalSetting() {
       return;
     }
 
-    // 残り日数
-    const diffMs = exam.getTime() - today.getTime();
-    const diffDaysRaw = diffMs / MS_PER_DAY;
-    const totalDays = Math.max(1, Math.ceil(diffDaysRaw));
+    const numericWeeklyHours =
+      weeklyHours === '' ? null : Number(weeklyHours) || null;
 
-    // 週次テンプレ（試験ガイドから設計したやつ）を取得
-    const weeklyTemplate: WeeklyPlan[] =
-      getPlanTemplateForCert(selectedCertCode) ?? [
-        // テンプレがない資格のときの簡易テンプレ
-        {
-          week: 1,
-          theme: 'Week 1 の学習内容',
-          topics: ['公式テキストを読み始める', '出題範囲の全体像を把握する'],
+    setIsGeneratingPlan(true);
+
+    let generatedPlan: DayPlan[] | null = null;
+
+    try {
+      const res = await fetch('/api/plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      ];
-
-    // 週次テンプレを「個々のトピック」にばらす
-    type FlatTask = { theme: string; topic: string };
-    const flatTasks: FlatTask[] = [];
-    weeklyTemplate.forEach((w) => {
-      w.topics.forEach((t) => {
-        flatTasks.push({ theme: w.theme, topic: t });
+        body: JSON.stringify({
+          goal: {
+            certCode: selectedCertCode,
+            certName: effectiveCertName,
+            examDate,
+            weeklyHours: numericWeeklyHours,
+          },
+        }),
       });
-    });
 
-    const totalTasks = flatTasks.length;
-    const tasksPerDay = Math.max(1, Math.ceil(totalTasks / totalDays));
-
-    const newPlan: DayPlan[] = [];
-
-    for (let i = 0; i < totalDays; i++) {
-      const date = new Date(today.getTime() + i * MS_PER_DAY);
-      const dateStr = toDateOnlyString(date);
-
-      const startIndex = i * tasksPerDay;
-      const dayTasks = flatTasks.slice(startIndex, startIndex + tasksPerDay);
-
-      let theme: string;
-      let topics: string[];
-
-      if (dayTasks.length > 0) {
-        theme = dayTasks[0].theme;
-        topics = dayTasks.map((t) => t.topic);
+      if (!res.ok) {
+        console.error('plan generation failed', await res.text());
       } else {
-        theme = '予備日・復習';
-        topics = ['これまでの内容の復習', '模試や問題演習'];
+        const data = await res.json();
+        if (Array.isArray(data.plan)) {
+          const normalized = normalizePlanItems(data.plan as ApiPlanItem[]);
+          if (normalized.length > 0) {
+            generatedPlan = normalized;
+          }
+        }
       }
-
-      newPlan.push({
-        dayIndex: i + 1,
-        date: dateStr,
-        theme,
-        topics,
-      });
+    } catch (error) {
+      console.error('plan generation error', error);
+    } finally {
+      setIsGeneratingPlan(false);
     }
 
-    setPlan(newPlan);
+    if (!generatedPlan) {
+      generatedPlan = buildFallbackPlan(examDate, selectedCertCode);
+    }
+
+    if (!generatedPlan || generatedPlan.length === 0) {
+      alert('学習計画の生成に失敗しました。時間をおいて再度お試しください。');
+      return;
+    }
+
+    setPlan(generatedPlan);
     setShowPlan(true);
   };
 
   // ==== 保存 ====
   const handleSavePlan = async () => {
+    if (selectedCertCode === 'other' && !trimmedCustomCertName) {
+      alert('資格名を入力してください。');
+      return;
+    }
+
     if (!userId) {
       alert('ユーザー情報の取得に失敗しました。再度ログインしてください。');
       return;
@@ -274,7 +409,7 @@ export default function GoalSetting() {
 
     // 1. Goal（試験情報）を localStorage に保存
     const goalPayload: StudyGoal = {
-      certName: displayCertName,
+      certName: effectiveCertName,
       examDate,
       weeklyHours: numericWeeklyHours, // number | null
     };
@@ -291,7 +426,7 @@ export default function GoalSetting() {
 
     const payload = {
       certCode: selectedCertCode,
-      certName: displayCertName,
+      certName: effectiveCertName,
       examDate,
       weeklyHours: numericWeeklyHours,
       weeksUntilExam: displayWeeks, // 表示に使っている週数を保存
@@ -430,7 +565,7 @@ export default function GoalSetting() {
                 onChange={(e) => {
                   const code = e.target.value;
                   setSelectedCertCode(code);
-                  const cert = CERTIFICATIONS.find((c) => c.code === code);
+                  const cert = availableCertifications.find((c) => c.code === code);
                   if (cert?.defaultWeeklyHours) {
                     setWeeklyHours(String(cert.defaultWeeklyHours));
                   } else {
@@ -438,7 +573,12 @@ export default function GoalSetting() {
                   }
                 }}
               >
-                {CERTIFICATIONS.map((cert) => (
+                {isLoadingCertifications && (
+                  <option value="" disabled>
+                    資格一覧を読み込み中…
+                  </option>
+                )}
+                {availableCertifications.map((cert) => (
                   <option key={cert.code} value={cert.code}>
                     {cert.name}
                   </option>
@@ -619,9 +759,10 @@ export default function GoalSetting() {
               </Button>
               <Button
                 onClick={handleGeneratePlan}
+                disabled={isGeneratingPlan}
                 className="h-12 flex-1 bg-blue-600 text-white hover:bg-blue-700"
               >
-                日付ごとの計画を作成する
+                {isGeneratingPlan ? '計画を生成中...' : '日付ごとの計画を作成する'}
               </Button>
             </div>
           </div>

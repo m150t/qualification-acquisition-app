@@ -1,9 +1,12 @@
 // apps/web/app/api/goals/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { DeleteCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { randomUUID } from 'crypto';
 import { ddb } from '@/src/lib/dynamodb';
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || 'StudyGoals';
+const CUSTOM_CERTIFICATIONS_TABLE =
+  process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || 'CustomCertifications';
 
 function getUserId(req: NextRequest) {
   const userId = req.headers.get('x-user-id');
@@ -44,6 +47,26 @@ export async function POST(req: NextRequest) {
         Item: item,
       }),
     );
+
+    if (body.certCode === 'other' && body.certName) {
+      try {
+        await ddb.send(
+          new PutCommand({
+            TableName: CUSTOM_CERTIFICATIONS_TABLE,
+            Item: {
+              id: randomUUID(),
+              userId,
+              certName: body.certName,
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        );
+      } catch (error) {
+        console.error('failed to save custom certification', error);
+      }
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
