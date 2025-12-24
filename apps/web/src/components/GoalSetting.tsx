@@ -192,7 +192,7 @@ export default function GoalSetting() {
   // 試験日
   const [examDate, setExamDate] = useState(getTodayYmd());
 
-  // 推奨学習時間（週）→ 表示用は string に統一
+  // 推奨学習時間→ 表示用は string に統一
   const [weeklyHours, setWeeklyHours] = useState<string>('');
 
   // 試験日までの週数（ざっくり）
@@ -501,7 +501,7 @@ export default function GoalSetting() {
               <p>
                 推奨学習時間:{" "}
                 {existingGoal.weeklyHours != null
-                  ? `週${existingGoal.weeklyHours}時間`
+                  ? `${existingGoal.weeklyHours}時間`
                   : '未設定'}
               </p>
               <p className="mt-2 text-xs">
@@ -656,7 +656,7 @@ export default function GoalSetting() {
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm text-gray-600">推奨学習時間</span>
                   <span className="text-sm text-gray-900">
-                    {weeklyHours ? `週${weeklyHours}時間` : '—'}
+                    {weeklyHours ? `${weeklyHours}時間` : '—'}
                   </span>
                 </div>
               </div>
@@ -724,7 +724,7 @@ export default function GoalSetting() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600">推奨学習時間（週）</span>
+                  <span className="text-sm text-gray-600">推奨学習時間</span>
                   <span className="text-sm text-gray-900">
                     {weeklyHours !== '' ? `${weeklyHours}時間` : '未設定'}
                   </span>
@@ -740,7 +740,7 @@ export default function GoalSetting() {
                 <div>
                   <p className="text-gray-900">日付ごとの学習計画</p>
                   <p className="text-sm text-gray-600">
-                    今日から試験日までの各日に、テンプレートの内容を順番に割り振ります。
+                    今日から試験日までの各日に、試験ガイドに記載の勉強すべき内容を割り振ります。
                   </p>
                 </div>
               </div>
@@ -792,13 +792,13 @@ export default function GoalSetting() {
                   <span>{examDate}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>学習期間（週換算）</span>
+                  <span>学習期間（週）</span>
                   <span>
                     {displayWeeks != null ? `${displayWeeks}週間` : '―'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>推奨学習時間（週）</span>
+                  <span>推奨学習時間</span>
                   <span>{weeklyHours !== '' ? `${weeklyHours}時間` : '未設定'}</span>
                 </div>
               </div>
