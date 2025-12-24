@@ -1,18 +1,66 @@
 // apps/web/app/api/plan/route.ts
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import { ddb } from '@/src/lib/dynamodb';
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const CERTIFICATIONS_TABLE =
+  process.env.DDB_CERTIFICATIONS_TABLE || 'Certifications';
+
 type GeneratePlanRequest = {
   goal: {
+    certCode?: string;
     certName: string;
     examDate: string;      // YYYY-MM-DD
-    weeklyHours: number;   // 目標学習時間（時間）
+    weeklyHours: number | null;   // 目標学習時間（時間）
   };
 };
+
+type ExamGuide =
+  | string
+  | {
+      summary?: string;
+      topics?: string[];
+      sourceUrl?: string;
+      notes?: string;
+    };
+
+function formatExamGuide(guide: ExamGuide | undefined): string | null {
+  if (!guide) return null;
+  if (typeof guide === 'string') {
+    return guide.trim() || null;
+  }
+  const lines: string[] = [];
+  if (guide.summary) lines.push(`概要: ${guide.summary}`);
+  if (Array.isArray(guide.topics) && guide.topics.length > 0) {
+    lines.push(`主要トピック:\n- ${guide.topics.join('\n- ')}`);
+  }
+  if (guide.notes) lines.push(`備考: ${guide.notes}`);
+  if (guide.sourceUrl) lines.push(`参照URL: ${guide.sourceUrl}`);
+  const formatted = lines.join('\n');
+  return formatted.trim() || null;
+}
+
+async function fetchExamGuide(certCode?: string): Promise<string | null> {
+  if (!certCode) return null;
+  try {
+    const res = await ddb.send(
+      new GetCommand({
+        TableName: CERTIFICATIONS_TABLE,
+        Key: { code: certCode },
+      }),
+    );
+    const item = res.Item as { examGuide?: ExamGuide; examGuideText?: string } | undefined;
+    return formatExamGuide(item?.examGuide ?? item?.examGuideText);
+  } catch (error) {
+    console.error('failed to load exam guide', error);
+    return null;
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -26,10 +74,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const examGuide = await fetchExamGuide(goal.certCode);
+    const examGuideSection = examGuide
+      ? `\n試験ガイド情報:\n${examGuide}\n`
+      : '\n試験ガイド情報: 未登録\n';
+
     const prompt = `
 資格名: ${goal.certName}
 試験日: ${goal.examDate}
-目標の週あたり学習時間: ${goal.weeklyHours} 時間
+目標の週あたり学習時間: ${goal.weeklyHours ?? '未設定'} 時間
+${examGuideSection}
 
 上記をもとに、試験日までの学習計画を立ててください。
 レスポンスは必ず JSON 配列のみで返してください。各要素は以下の形式：

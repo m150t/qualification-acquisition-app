@@ -9,7 +9,7 @@ export type Certification = {
   defaultWeeklyHours?: number;
 };
 
-export const CERTIFICATIONS: Certification[] = [
+export const FALLBACK_CERTIFICATIONS: Certification[] = [
   {
     code: 'aws-saa',
     name: 'AWS認定ソリューションアーキテクト - アソシエイト',
@@ -31,7 +31,7 @@ export const CERTIFICATIONS: Certification[] = [
 
 // code → Certification の簡易検索ヘルパ
 export function findCertByCode(code: string): Certification | undefined {
-  return CERTIFICATIONS.find((c) => c.code === code);
+  return FALLBACK_CERTIFICATIONS.find((c) => c.code === code);
 }
 
 
