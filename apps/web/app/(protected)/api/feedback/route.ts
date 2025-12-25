@@ -5,7 +5,7 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
-const MODEL = "gpt-5-mini";
+const MODEL = "gpt-4.1-mini";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
