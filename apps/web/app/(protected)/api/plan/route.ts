@@ -95,7 +95,7 @@ ${examGuideSection}
 `;
 
     const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5-nano',
       messages: [
         {
           role: 'system',
