@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuthenticator } from "@aws-amplify/ui-react";
+import { deleteUser } from "aws-amplify/auth";
 import { useRouter } from "next/navigation";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -54,7 +55,10 @@ function makeDateKey(d: Date): string {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user } = useAuthenticator((context) => [context.user]);
+  const { user, signOut } = useAuthenticator((context) => [
+    context.user,
+    context.signOut,
+  ]);
   const userId = user?.userId ?? user?.username ?? '';
 
   const [goal, setGoal] = useState<StudyGoal | null>(null);
@@ -62,6 +66,7 @@ export default function Dashboard() {
   const [reports, setReports] = useState<Report[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isProcessingResult, setIsProcessingResult] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // 「今日」のキー（0:00固定）
   const todayDate = useMemo(() => {
