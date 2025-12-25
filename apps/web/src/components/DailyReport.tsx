@@ -90,6 +90,18 @@ export default function DailyReport() {
       const data = await feedbackRes.json().catch(() => ({}));
       if (data.comment) {
         setAiComment(data.comment);
+        // ★ ここでDB更新
+        await fetch('/api/reports', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': userId,
+          },
+          body: JSON.stringify({
+            date,
+            aiComment: data.comment,
+          }),
+        });
       } else {
         setAiComment(
           'コメントを取得できませんでした（comment フィールドが空でした）。',
