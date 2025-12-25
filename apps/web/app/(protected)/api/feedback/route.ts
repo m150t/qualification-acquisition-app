@@ -4,12 +4,13 @@ import crypto from "crypto";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const MODEL = "gpt-4.1-mini";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 function getUserId(req: NextRequest) {
   return req.headers.get("x-user-id");
@@ -28,20 +29,10 @@ function safeNumber(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-type PlanDay = {
-  date: string;      // 'YYYY-MM-DD'
-  theme?: string;
-  tasks?: string[];
-};
+type PlanDay = { date: string; theme?: string; tasks?: string[] };
 
 async function getPlanDay(userId: string, date: string, requestId: string): Promise<PlanDay | null> {
-  const res = await ddb.send(
-    new GetCommand({
-      TableName: GOALS_TABLE,
-      Key: { userId },
-    })
-  );
-
+  const res = await ddb.send(new GetCommand({ TableName: GOALS_TABLE, Key: { userId } }));
   if (!res.Item) return null;
 
   const plan = (res.Item as any).plan;
@@ -53,14 +44,7 @@ async function getPlanDay(userId: string, date: string, requestId: string): Prom
   const tasks = Array.isArray(day.tasks) ? day.tasks.filter((t: any) => typeof t === "string") : [];
   const theme = typeof day.theme === "string" ? day.theme : undefined;
 
-  log("info", "plan found", {
-    requestId,
-    userIdHash: hash8(userId),
-    date,
-    plannedTasks: tasks.length,
-    hasTheme: Boolean(theme),
-  });
-
+  log("info", "plan found", { requestId, userIdHash: hash8(userId), date, plannedTasks: tasks.length, hasTheme: Boolean(theme) });
   return { date, theme, tasks };
 }
 
@@ -70,43 +54,29 @@ export async function POST(req: NextRequest) {
 
   try {
     const userId = getUserId(req);
-    if (!userId) {
-      return NextResponse.json({ error: "userId header is required" }, { status: 401 });
-    }
+    if (!userId) return NextResponse.json({ error: "userId header is required" }, { status: 401 });
 
     if (!process.env.OPENAI_API_KEY) {
       log("error", "OPENAI_API_KEY missing", { requestId, userIdHash: hash8(userId) });
-      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+      return NextResponse.json({ error: "Server misconfigured", requestId }, { status: 500 });
     }
 
     const body = await req.json();
-    const content = String(body.content ?? "");
-    const date = String(body.date ?? ""); 
+    const content = String(body.content ?? "").trim();
+    const date = String(body.date ?? "").trim();
     const studyTime = safeNumber(body.studyTime);
     const tasksCompleted = safeNumber(body.tasksCompleted);
 
-    if (!content || !date) {
-      return NextResponse.json({ error: "content and date are required" }, { status: 400 });
-    }
+    if (!content || !date) return NextResponse.json({ error: "content and date are required" }, { status: 400 });
 
-    log("info", "feedback input", {
-      requestId,
-      userIdHash: hash8(userId),
-      date,
-      studyTime,
-      tasksCompleted,
-      contentLen: content.length,
-    });
+    log("info", "feedback input", { requestId, userIdHash: hash8(userId), date, studyTime, tasksCompleted, contentLen: content.length });
 
-    // 1) 計画を取得（同じ StudyGoals テーブルの plan 配列から当日分）
     const planDay = await getPlanDay(userId, date, requestId);
     const plannedTasks = planDay?.tasks?.length ?? null;
 
-    // 2) 達成率（取れる時だけ）
     const completionRate =
       plannedTasks && tasksCompleted != null ? Math.min(1, Math.max(0, tasksCompleted / plannedTasks)) : null;
 
-    // 3) プロンプト
     const system = [
       "あなたは資格学習を応援する優しいコーチです。",
       "日報（実績）と当日の計画（予定）を比較し、進捗・ズレを具体的にコメントしてください。",
@@ -124,19 +94,28 @@ export async function POST(req: NextRequest) {
         ? `【当日の計画】テーマ: ${planDay.theme ?? "不明"} / 予定タスク: ${JSON.stringify(planDay.tasks ?? [])}`
         : "【当日の計画】未登録または取得できませんでした",
       completionRate != null ? `【計画タスク達成率】${Math.round(completionRate * 100)}%` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
+    ].filter(Boolean).join("\n");
 
-    // 4) OpenAI
-    const completion = await client.chat.completions.create({
-      model: MODEL,
-      max_completion_tokens: 240,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    });
+    // ---- timeout guard
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 8000);
+
+    let completion;
+    try {
+      completion = await client.chat.completions.create(
+        {
+          model: MODEL,
+          max_completion_tokens: 240,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        },
+        { signal: ac.signal }
+      );
+    } finally {
+      clearTimeout(timer);
+    }
 
     const commentText = completion.choices?.[0]?.message?.content?.trim() ?? "";
 
@@ -149,10 +128,7 @@ export async function POST(req: NextRequest) {
         model: completion.model,
         ms: Date.now() - start,
       });
-      
-      return NextResponse.json({
-        comment: "コメントを取得できませんでした（AI応答が空でした）。",
-      });
+      return NextResponse.json({ comment: "コメントを取得できませんでした（AI応答が空でした）。", requestId });
     }
 
     log("info", "feedback success", {
@@ -164,21 +140,17 @@ export async function POST(req: NextRequest) {
       hasPlan: Boolean(planDay),
     });
 
-    return NextResponse.json({ comment: commentText });
+    return NextResponse.json({ comment: commentText, requestId });
   } catch (e: any) {
-    const status = e?.status ?? e?.response?.status;
     const message = e?.message ?? String(e);
 
-    log("error", "feedback error", {
-      requestId,
-      status,
-      message,
-      ms: Date.now() - start,
-    });
+    log("error", "feedback error", { requestId, message, ms: Date.now() - start });
 
-    return NextResponse.json(
-      { error: "AIコメント生成に失敗しました", detail: message, requestId },
-      { status: 500 }
-    );
+    // タイムアウト/abort の場合は 500 じゃなく 200 で固定文返すのもアリ（UX優先）
+    if (String(message).toLowerCase().includes("aborted")) {
+      return NextResponse.json({ comment: "今日はここまででも十分！次は計画と照らして1点だけ復習しよう。", requestId });
+    }
+
+    return NextResponse.json({ error: "AIコメント生成に失敗しました", detail: message, requestId }, { status: 500 });
   }
 }
