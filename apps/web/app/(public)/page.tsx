@@ -54,9 +54,38 @@ export default function LandingPage() {
           <Feature title="記録" desc="進捗が見えるから、続く。" />
         </div>
 
-        <div style={{ marginTop: 56, fontSize: 12, color: "#666" }}>
-          ※ 現在、試験的に公開しています（ベータ版）。至らない点もありますが、順次改善していきます。
-          　 お問合せ先：https://forms.gle/GwcLWTGeKGwLwdkC9
+        <div
+          style={{
+            marginTop: 56,
+            fontSize: 12,
+            color: "#666",
+            display: "flex",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <span>※ 現在ベータ版として公開中です。</span>
+        
+          <Link href="/howto" style={{ color: "#666", textDecoration: "underline" }}>
+            使い方
+          </Link>
+        
+          <Link href="/terms" style={{ color: "#666", textDecoration: "underline" }}>
+            利用規約
+          </Link>
+        
+          <Link href="/privacy" style={{ color: "#666", textDecoration: "underline" }}>
+            プライバシーポリシー
+          </Link>
+        
+          <a
+            href="https://forms.gle/GwcLWTGeKGwLwdkC9"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#666", textDecoration: "underline" }}
+          >
+            お問い合わせ
+          </a>
         </div>
       </div>
     </main>
