@@ -1,175 +1,184 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// app/api/feedback/route.ts
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import crypto from "crypto";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { ddb } from "@/src/lib/dynamodb";
+
+const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
+const MODEL = "gpt-5-nano";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// Responses API の output からテキストを抜き出す
-function extractTextFromResponseOutput(output: any): string {
-  if (!Array.isArray(output)) return '';
+function getUserId(req: NextRequest) {
+  return req.headers.get("x-user-id");
+}
 
-  return output
-    .map((block: any) => {
-      if (!block?.content || !Array.isArray(block.content)) return '';
+function hash8(s: string) {
+  return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
+}
 
-      return block.content
-        .map((part: any) => {
-          if (!part) return '';
-          if (
-            (part.type === 'output_text' || part.type === 'text') &&
-            typeof part.text === 'string'
-          ) {
-            return part.text;
-          }
-          if (typeof part.text === 'string') {
-            return part.text;
-          }
-          return '';
-        })
-        .join('');
+function log(level: "info" | "warn" | "error", msg: string, meta: Record<string, any>) {
+  console[level](JSON.stringify({ level, msg, time: new Date().toISOString(), ...meta }));
+}
+
+function safeNumber(v: any): number | null {
+  const n = typeof v === "string" ? Number(v) : v;
+  return Number.isFinite(n) ? n : null;
+}
+
+type PlanDay = {
+  date: string;      // 'YYYY-MM-DD'
+  theme?: string;
+  tasks?: string[];
+};
+
+async function getPlanDay(userId: string, date: string, requestId: string): Promise<PlanDay | null> {
+  const res = await ddb.send(
+    new GetCommand({
+      TableName: GOALS_TABLE,
+      Key: { userId },
     })
-    .join('')
-    .trim();
+  );
+
+  if (!res.Item) return null;
+
+  const plan = (res.Item as any).plan;
+  if (!Array.isArray(plan)) return null;
+
+  const day = plan.find((p: any) => p?.date === date);
+  if (!day) return null;
+
+  const tasks = Array.isArray(day.tasks) ? day.tasks.filter((t: any) => typeof t === "string") : [];
+  const theme = typeof day.theme === "string" ? day.theme : undefined;
+
+  log("info", "plan found", {
+    requestId,
+    userIdHash: hash8(userId),
+    date,
+    plannedTasks: tasks.length,
+    hasTheme: Boolean(theme),
+  });
+
+  return { date, theme, tasks };
 }
 
-// content が string でも配列でもオブジェクトでも、とにかく文字列に潰す保険関数
-function extractTextFromMessageContent(content: any): string {
-  if (!content) return '';
+export async function POST(req: NextRequest) {
+  const requestId = crypto.randomUUID();
+  const start = Date.now();
 
-  // 1) ふつうの string
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  // 2) 配列（新仕様で [ { type: 'text', text: '...' }, ... ] 的なやつ）
-  if (Array.isArray(content)) {
-    return content
-      .map((part: any) => {
-        if (!part) return '';
-
-        if (typeof part === 'string') return part;
-
-        // { type: 'text', text: '...' }
-        if (
-          (part.type === 'text' || part.type === 'output_text') &&
-          typeof part.text === 'string'
-        ) {
-          return part.text;
-        }
-
-        // { text: '...' }
-        if (typeof part.text === 'string') {
-          return part.text;
-        }
-
-        // { text: [ { text: '...' } ] }
-        if (Array.isArray(part.text)) {
-          return part.text
-            .map((t: any) => {
-              if (!t) return '';
-              if (typeof t === 'string') return t;
-              if (typeof t.text === 'string') return t.text;
-              return '';
-            })
-            .join('');
-        }
-
-        return '';
-      })
-      .join('');
-  }
-
-  // 3) オブジェクト単体
-  if (typeof content === 'object') {
-    // { type: 'text', text: '...' }
-    if (
-      (content as any).type === 'text' &&
-      typeof (content as any).text === 'string'
-    ) {
-      return (content as any).text;
-    }
-
-    if (typeof (content as any).text === 'string') {
-      return (content as any).text;
-    }
-
-    if (Array.isArray((content as any).text)) {
-      return (content as any).text
-        .map((t: any) => {
-          if (!t) return '';
-          if (typeof t === 'string') return t;
-          if (typeof t.text === 'string') return t.text;
-          return '';
-        })
-        .join('');
-    }
-
-    try {
-      return JSON.stringify(content);
-    } catch {
-      return '';
-    }
-  }
-
-  return '';
-}
-
-export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { content, studyTime, tasksCompleted } = body;
-
-    console.log('feedback input', body, new Date().toISOString());
-
-    if (!content) {
-      return NextResponse.json(
-        { error: 'content がありません' },
-        { status: 400 },
-      );
+    const userId = getUserId(req);
+    if (!userId) {
+      return NextResponse.json({ error: "userId header is required" }, { status: 401 });
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      log("error", "OPENAI_API_KEY missing", { requestId, userIdHash: hash8(userId) });
+      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+    }
+
+    const body = await req.json();
+    const content = String(body.content ?? "");
+    const date = String(body.date ?? ""); 
+    const studyTime = safeNumber(body.studyTime);
+    const tasksCompleted = safeNumber(body.tasksCompleted);
+
+    if (!content || !date) {
+      return NextResponse.json({ error: "content and date are required" }, { status: 400 });
+    }
+
+    log("info", "feedback input", {
+      requestId,
+      userIdHash: hash8(userId),
+      date,
+      studyTime,
+      tasksCompleted,
+      contentLen: content.length,
+    });
+
+    // 1) 計画を取得（同じ StudyGoals テーブルの plan 配列から当日分）
+    const planDay = await getPlanDay(userId, date, requestId);
+    const plannedTasks = planDay?.tasks?.length ?? null;
+
+    // 2) 達成率（取れる時だけ）
+    const completionRate =
+      plannedTasks && tasksCompleted != null ? Math.min(1, Math.max(0, tasksCompleted / plannedTasks)) : null;
+
+    // 3) プロンプト
+    const system = [
+      "あなたは資格学習を応援する優しいコーチです。",
+      "日報（実績）と当日の計画（予定）を比較し、進捗・ズレを具体的にコメントしてください。",
+      "出力は必ず日本語。空文字は禁止。",
+      "構成：①ねぎらい ②進捗評価（計画比）③次の一手 1〜2個（具体的）",
+      "断定しすぎない。情報が無い部分は推測しない。",
+    ].join("\n");
+
+    const user = [
+      `【日付】${date}`,
+      `【日報】${content}`,
+      `【学習時間(時間)】${studyTime ?? "不明"}`,
+      `【完了タスク数】${tasksCompleted ?? "不明"}`,
+      planDay
+        ? `【当日の計画】テーマ: ${planDay.theme ?? "不明"} / 予定タスク: ${JSON.stringify(planDay.tasks ?? [])}`
+        : "【当日の計画】未登録または取得できませんでした",
+      completionRate != null ? `【計画タスク達成率】${Math.round(completionRate * 100)}%` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    // 4) OpenAI
     const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      max_completion_tokens: 300,
+      model: MODEL,
+      max_completion_tokens: 240,
       messages: [
-          {
-            role: 'system',
-            content:
-              'あなたは資格学習を応援する優しいコーチです。' +
-              '学習内容を褒めつつ、「次に何をやると良いか」を1〜2個具体的に提案してください。',
-          },
-          {
-            role: 'user',
-            content: `今日の学習内容: ${content}\n学習時間: ${
-              studyTime ?? '不明'
-            }時間\n完了タスク数: ${tasksCompleted ?? '不明'}件`,
-          },
+        { role: "system", content: system },
+        { role: "user", content: user },
       ],
     });
 
-    const msg = completion.choices[0]?.message;
-    console.log("feedback raw", JSON.stringify(completion, null, 2));
-    const commentText = msg?.content?.trim();
+    const commentText = completion.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!commentText) {
+      log("warn", "empty completion", {
+        requestId,
+        userIdHash: hash8(userId),
+        date,
+        finishReason: completion.choices?.[0]?.finish_reason,
+        model: completion.model,
+        ms: Date.now() - start,
+      });
+      
       return NextResponse.json({
-        comment:
-          'コメントを取得できませんでした（content のパースに失敗しました）。',
+        comment: "コメントを取得できませんでした（AI応答が空でした）。",
       });
     }
 
+    log("info", "feedback success", {
+      requestId,
+      userIdHash: hash8(userId),
+      date,
+      ms: Date.now() - start,
+      chars: commentText.length,
+      hasPlan: Boolean(planDay),
+    });
+
     return NextResponse.json({ comment: commentText });
   } catch (e: any) {
-    console.error('feedback api error', e);
+    const status = e?.status ?? e?.response?.status;
+    const message = e?.message ?? String(e);
+
+    log("error", "feedback error", {
+      requestId,
+      status,
+      message,
+      ms: Date.now() - start,
+    });
+
     return NextResponse.json(
-      {
-        error: 'AIコメント生成に失敗しました',
-        detail: e?.message ?? String(e),
-      },
-      { status: 500 },
+      { error: "AIコメント生成に失敗しました", detail: message, requestId },
+      { status: 500 }
     );
   }
 }
