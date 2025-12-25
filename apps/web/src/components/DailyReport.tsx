@@ -70,6 +70,7 @@ export default function DailyReport() {
           'x-user-id': userId, 
         },
         body: JSON.stringify({
+          date,
           content,
           studyTime,
           tasksCompleted,
