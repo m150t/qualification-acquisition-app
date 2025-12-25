@@ -328,34 +328,6 @@ export default function Dashboard() {
     router.push('/goal');
   };
 
-  const handleDeleteAccount = async () => {
-    if (!userId) {
-      alert('ユーザー情報の取得に失敗しました。再度ログインしてください。');
-      return;
-    }
-    if (!window.confirm('データが削除されますがよろしいですか？')) {
-      return;
-    }
-
-    setIsDeletingAccount(true);
-    try {
-      const res = await fetch('/api/account', {
-        method: 'DELETE',
-        headers: { 'x-user-id': userId },
-      });
-      if (!res.ok) {
-        const message = await res.text();
-        throw new Error(message || 'failed to delete account data');
-      }
-      await deleteUser();
-      await signOut();
-    } catch (error) {
-      console.error('failed to delete account', error);
-      alert('退会処理に失敗しました。時間をおいて再度お試しください。');
-    } finally {
-      setIsDeletingAccount(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -584,25 +556,6 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* 退会 */}
-        <Card className="border-red-200 bg-red-50 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <h3 className="text-gray-900">退会</h3>
-              <p className="text-xs text-gray-600">
-                ユーザー情報を含む全てのデータが削除されます。
-              </p>
-            </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteAccount}
-              disabled={isDeletingAccount}
-            >
-              退会する
-            </Button>
-          </div>
-        </Card>
       </div>
 
       {/* ===== フッター ===== */}
