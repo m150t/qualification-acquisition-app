@@ -65,7 +65,10 @@ export default function DailyReport() {
 
       const feedbackRes = await fetch('/api/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId, 
+        },
         body: JSON.stringify({
           content,
           studyTime,
