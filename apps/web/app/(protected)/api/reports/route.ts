@@ -1,6 +1,6 @@
 // apps/web/app/api/reports/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { BatchWriteCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { BatchWriteCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb } from '@/src/lib/dynamodb';
 
 const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || 'StudyReports';
@@ -173,5 +173,55 @@ export async function DELETE(req: NextRequest) {
       { error: 'failed to delete reports' },
       { status: 500 },
     );
+  }
+}
+// ----------------------
+// PATCH（AIコメント更新）
+// ----------------------
+export async function PATCH(req: NextRequest) {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return NextResponse.json({ error: 'userId header is required' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { date, aiComment } = body;
+
+    if (!date || !aiComment) {
+      return NextResponse.json({ error: 'date and aiComment are required' }, { status: 400 });
+    }
+
+    // 最新の1件（同日）を取得
+    const res = await ddb.send(
+      new QueryCommand({
+        TableName: REPORTS_TABLE,
+        KeyConditionExpression: 'userId = :uid',
+        ExpressionAttributeValues: { ':uid': userId },
+        ScanIndexForward: false,
+        Limit: 1,
+      }),
+    );
+
+    const item = res.Items?.[0];
+    if (!item) {
+      return NextResponse.json({ error: 'report not found' }, { status: 404 });
+    }
+
+    await ddb.send(
+      new UpdateCommand({
+        TableName: REPORTS_TABLE,
+        Key: { userId, date: item.date },
+        UpdateExpression: 'SET aiComment = :c',
+        ExpressionAttributeValues: {
+          ':c': aiComment,
+        },
+      }),
+    );
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('reports PATCH error', e);
+    return NextResponse.json({ error: 'failed to update report' }, { status: 500 });
   }
 }
