@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const plan = normalizePlan(body.plan);
+    const resetReports = Boolean(body.resetReports);
 
     const item = {
       userId: auth.userId,
@@ -142,6 +143,10 @@ export async function POST(req: NextRequest) {
         Item: item,
       }),
     );
+
+    if (resetReports) {
+      await deleteUserReports(auth.userId, requestId);
+    }
 
     if (body.certCode === "other" && body.certName) {
       try {
