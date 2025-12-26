@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  BatchWriteCommand,
-  DeleteCommand,
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { hash8, log } from "@/src/lib/logger";
+import { deleteReportsForUser } from "@/src/lib/reportStore";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
@@ -43,45 +38,26 @@ function normalizePlan(plan: unknown) {
 }
 
 async function deleteUserReports(userId: string, requestId: string) {
-  const res = await ddb.send(
-    new QueryCommand({
-      TableName: REPORTS_TABLE,
-      KeyConditionExpression: "userId = :uid",
-      ExpressionAttributeValues: { ":uid": userId },
-      ProjectionExpression: "userId, #d",
-      ExpressionAttributeNames: { "#d": "date" },
-    }),
-  );
-
-  const items = res.Items ?? [];
-  if (!items.length) {
+  const result = await deleteReportsForUser(userId, REPORTS_TABLE);
+  if (result.deleted === 0 && result.unprocessed === 0) {
     log("info", "reports delete empty", { requestId, userIdHash: hash8(userId) });
-    return 0;
+    return result;
   }
-
-  const batches: typeof items[] = [];
-  for (let i = 0; i < items.length; i += 25) {
-    batches.push(items.slice(i, i + 25));
+  if (result.unprocessed > 0) {
+    log("warn", "reports delete partial", {
+      requestId,
+      userIdHash: hash8(userId),
+      deleted: result.deleted,
+      unprocessed: result.unprocessed,
+    });
+  } else {
+    log("info", "reports delete success", {
+      requestId,
+      userIdHash: hash8(userId),
+      deleted: result.deleted,
+    });
   }
-
-  for (const batch of batches) {
-    await ddb.send(
-      new BatchWriteCommand({
-        RequestItems: {
-          [REPORTS_TABLE]: batch.map((it) => ({
-            DeleteRequest: { Key: { userId: it.userId, date: it.date } },
-          })),
-        },
-      }),
-    );
-  }
-
-  log("info", "reports delete success", {
-    requestId,
-    userIdHash: hash8(userId),
-    deleted: items.length,
-  });
-  return items.length;
+  return result;
 }
 
 // POST: 目標＋日付ベースの計画を保存

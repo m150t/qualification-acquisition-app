@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   BatchWriteCommand,
   DeleteCommand,
-  QueryCommand,
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { hash8, log } from "@/src/lib/logger";
+import { deleteReportsForUser } from "@/src/lib/reportStore";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
@@ -16,35 +16,7 @@ const CUSTOM_CERTIFICATIONS_TABLE =
   process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || "CustomCertifications";
 
 async function deleteReports(userId: string) {
-  const res = await ddb.send(
-    new QueryCommand({
-      TableName: REPORTS_TABLE,
-      KeyConditionExpression: "userId = :uid",
-      ExpressionAttributeValues: { ":uid": userId },
-      ProjectionExpression: "userId, #d",
-      ExpressionAttributeNames: { "#d": "date" },
-    }),
-  );
-
-  const items = res.Items ?? [];
-  if (!items.length) return;
-
-  const batches: typeof items[] = [];
-  for (let i = 0; i < items.length; i += 25) {
-    batches.push(items.slice(i, i + 25));
-  }
-
-  for (const batch of batches) {
-    await ddb.send(
-      new BatchWriteCommand({
-        RequestItems: {
-          [REPORTS_TABLE]: batch.map((it) => ({
-            DeleteRequest: { Key: { userId: it.userId, date: it.date } },
-          })),
-        },
-      }),
-    );
-  }
+  await deleteReportsForUser(userId, REPORTS_TABLE);
 }
 
 async function deleteCustomCertifications(userId: string) {
