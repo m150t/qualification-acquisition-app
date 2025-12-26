@@ -5,14 +5,17 @@ import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 const MAX_CERT_NAME_LENGTH = 200;
 const MAX_EXAM_DATE_LENGTH = 20;
+const MAX_PLAN_DAYS = 366;
+const MAX_TASKS_PER_DAY = 20;
+const MAX_TASK_LENGTH = 200;
+const MAX_THEME_LENGTH = 200;
 
 type GeneratePlanRequest = {
   goal: {
@@ -32,6 +35,12 @@ type ExamGuide =
       notes?: string;
     };
 
+type PlanDay = {
+  date: string;
+  theme?: string;
+  tasks?: string[];
+};
+
 function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (!guide) return null;
   if (typeof guide === "string") {
@@ -46,6 +55,21 @@ function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (guide.sourceUrl) lines.push(`参照URL: ${guide.sourceUrl}`);
   const formatted = lines.join("\n");
   return formatted.trim() || null;
+}
+
+function sanitizePlan(input: unknown): PlanDay[] {
+  if (!Array.isArray(input)) return [];
+  return input.slice(0, MAX_PLAN_DAYS).map((day) => {
+    const date = typeof day?.date === "string" ? day.date.trim().slice(0, MAX_EXAM_DATE_LENGTH) : "";
+    const theme = typeof day?.theme === "string" ? day.theme.trim().slice(0, MAX_THEME_LENGTH) : undefined;
+    const rawTasks = Array.isArray(day?.tasks) ? day.tasks : [];
+    const tasks = rawTasks
+      .filter((task: unknown) => typeof task === "string")
+      .slice(0, MAX_TASKS_PER_DAY)
+      .map((task: string) => task.trim().slice(0, MAX_TASK_LENGTH))
+      .filter((task: string) => task.length > 0);
+    return { date, theme, tasks };
+  });
 }
 
 async function fetchExamGuide(certCode?: string): Promise<string | null> {
@@ -71,6 +95,16 @@ export async function POST(req: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "Server misconfigured" },
+        { status: 500 },
+      );
+    }
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
     const ip = getClientIp(req.headers);
     const limiter = rateLimit(`plan:${auth.userId}:${ip}`, { limit: 5, windowMs: 60_000 });
@@ -130,14 +164,12 @@ ${examGuideSection}
     const msg = completion.choices[0]?.message;
     const text = (msg?.content ?? "").toString().trim();
 
-    let plan: Array<Record<string, unknown>> = [];
+    let plan: PlanDay[] = [];
 
     try {
       if (text) {
         const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) {
-          plan = parsed as Array<Record<string, unknown>>;
-        }
+        plan = sanitizePlan(parsed);
       }
     } catch (e) {
       console.error("failed to parse plan JSON", e);
@@ -151,7 +183,6 @@ ${examGuideSection}
     return NextResponse.json(
       {
         error: "学習計画の生成に失敗しました",
-        detail: e instanceof Error ? e.message : String(e),
       },
       { status: 500 },
     );
