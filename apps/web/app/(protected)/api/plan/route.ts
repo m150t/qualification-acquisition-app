@@ -187,7 +187,6 @@ ${examGuideSection}
             { role: "user", content: prompt },
           ],
         },
-        { signal: ac.signal },
       );
       console.log("plan api openai completed", {
         requestId,
@@ -206,8 +205,6 @@ ${examGuideSection}
         });
       }
       throw error;
-    } finally {
-      clearTimeout(timer);
     }
 
     const msg = completion.choices[0]?.message;
