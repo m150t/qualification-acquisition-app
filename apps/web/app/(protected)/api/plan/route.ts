@@ -146,17 +146,36 @@ ${examGuideSection}
 }
 `;
 
-    const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 15_000);
+
+    let completion;
+    try {
+      completion = await client.chat.completions.create(
         {
-          role: "system",
-          content:
-            "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。",
+          model: "gpt-4.1-mini",
+          messages: [
+            {
+              role: "system",
+              content:
+                "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。",
+            },
+            { role: "user", content: prompt },
+          ],
         },
-        { role: "user", content: prompt },
-      ],
-    });
+        { signal: ac.signal },
+      );
+    } catch (error) {
+      if (ac.signal.aborted || isAbortError(error)) {
+        return NextResponse.json({
+          plan: [],
+          warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
 
     const msg = completion.choices[0]?.message;
     const text = (msg?.content ?? "").toString().trim();
@@ -176,6 +195,12 @@ ${examGuideSection}
 
     return NextResponse.json({ plan });
   } catch (e: unknown) {
+    if (isAbortError(e)) {
+      return NextResponse.json({
+        plan: [],
+        warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
+      });
+    }
     console.error("plan api error", e);
     return NextResponse.json(
       {
