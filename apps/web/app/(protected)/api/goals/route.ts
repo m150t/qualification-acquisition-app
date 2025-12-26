@@ -6,7 +6,6 @@ import {
   PutCommand,
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
-import type { WriteRequest } from "@aws-sdk/client-dynamodb";
 import { randomUUID } from "crypto";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
@@ -87,9 +86,10 @@ async function deleteUserReports(userId: string, requestId: string) {
   }
 
   for (const batch of batches) {
-    let unprocessed: WriteRequest[] = batch.map((it) => ({
-      DeleteRequest: { Key: { userId: it.userId, date: it.date } },
-    }));
+    let unprocessed: Array<{ DeleteRequest: { Key: { userId: string; date: string } } }> =
+      batch.map((it) => ({
+        DeleteRequest: { Key: { userId: it.userId, date: it.date } },
+      }));
     let attempts = 0;
     while (unprocessed.length > 0 && attempts < 5) {
       const res = await ddb.send(
@@ -99,7 +99,10 @@ async function deleteUserReports(userId: string, requestId: string) {
           },
         }),
       );
-      unprocessed = res.UnprocessedItems?.[REPORTS_TABLE] ?? [];
+      unprocessed =
+        (res.UnprocessedItems?.[REPORTS_TABLE] as
+          | Array<{ DeleteRequest: { Key: { userId: string; date: string } } }>
+          | undefined) ?? [];
       attempts += 1;
     }
   }
