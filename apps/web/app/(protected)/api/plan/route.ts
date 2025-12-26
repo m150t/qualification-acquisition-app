@@ -38,6 +38,15 @@ type PlanDay = {
   tasks?: string[];
 };
 
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: string }).name === "AbortError"
+  );
+}
+
 function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (!guide) return null;
   if (typeof guide === "string") {
@@ -87,7 +96,11 @@ async function fetchExamGuide(certCode?: string): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const requestId =
+    req.headers.get("x-request-id") ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const requestStartedAt = Date.now();
   try {
+    console.log("plan api start", { requestId });
     const auth = await requireAuth(req);
     if (!auth) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -126,7 +139,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const examGuideStartedAt = Date.now();
     const examGuide = await fetchExamGuide(goal.certCode);
+    console.log("plan api exam guide fetched", {
+      requestId,
+      elapsedMs: Date.now() - examGuideStartedAt,
+      hasExamGuide: Boolean(examGuide),
+    });
     const examGuideSection = examGuide
       ? `\n試験ガイド情報:\n${examGuide}\n`
       : "\n試験ガイド情報: 未登録\n";
@@ -146,11 +165,13 @@ ${examGuideSection}
 }
 `;
 
+    const timeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "20000");
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 15_000);
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
 
     let completion;
     try {
+      const openAiStartedAt = Date.now();
       completion = await client.chat.completions.create(
         {
           model: "gpt-4.1-mini",
@@ -165,8 +186,17 @@ ${examGuideSection}
         },
         { signal: ac.signal },
       );
+      console.log("plan api openai completed", {
+        requestId,
+        elapsedMs: Date.now() - openAiStartedAt,
+      });
     } catch (error) {
       if (ac.signal.aborted || isAbortError(error)) {
+        console.warn("plan api openai timeout", {
+          requestId,
+          elapsedMs: Date.now() - requestStartedAt,
+          timeoutMs,
+        });
         return NextResponse.json({
           plan: [],
           warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
@@ -193,9 +223,18 @@ ${examGuideSection}
       plan = [];
     }
 
+    console.log("plan api success", {
+      requestId,
+      elapsedMs: Date.now() - requestStartedAt,
+      planDays: plan.length,
+    });
     return NextResponse.json({ plan });
   } catch (e: unknown) {
     if (isAbortError(e)) {
+      console.warn("plan api aborted", {
+        requestId,
+        elapsedMs: Date.now() - requestStartedAt,
+      });
       return NextResponse.json({
         plan: [],
         warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
