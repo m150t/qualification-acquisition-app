@@ -33,7 +33,8 @@ async function getPlanDay(userId: string, date: string, requestId: string): Prom
   const day = plan.find((p: any) => p?.date === date);
   if (!day) return null;
 
-  const tasks = Array.isArray(day.tasks) ? day.tasks.filter((t: any) => typeof t === "string") : [];
+  const rawTasks = Array.isArray(day.tasks) ? day.tasks : Array.isArray(day.topics) ? day.topics : [];
+  const tasks = rawTasks.filter((t: any) => typeof t === "string");
   const theme = typeof day.theme === "string" ? day.theme : undefined;
 
   log("info", "plan found", { requestId, userIdHash: hash8(userId), date, plannedTasks: tasks.length, hasTheme: Boolean(theme) });
