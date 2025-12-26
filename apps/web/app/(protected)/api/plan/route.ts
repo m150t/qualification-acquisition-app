@@ -16,6 +16,7 @@ const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
 const MAX_EXAM_GUIDE_CHARS = 1500;
 const OPENAI_MAX_TOKENS = 1200;
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 type GeneratePlanRequest = {
   goal: {
@@ -69,10 +70,26 @@ function formatExamGuide(guide: ExamGuide | undefined): string | null {
   return formatted.slice(0, MAX_EXAM_GUIDE_CHARS);
 }
 
+function normalizeDateString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (DATE_ONLY_REGEX.test(trimmed)) return trimmed;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return trimmed.slice(0, MAX_EXAM_DATE_LENGTH);
+  }
+  parsed.setHours(0, 0, 0, 0);
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function sanitizePlan(input: unknown): PlanDay[] {
   if (!Array.isArray(input)) return [];
   return input.slice(0, MAX_PLAN_DAYS).map((day) => {
-    const date = typeof day?.date === "string" ? day.date.trim().slice(0, MAX_EXAM_DATE_LENGTH) : "";
+    const date =
+      typeof day?.date === "string" ? normalizeDateString(day.date) : "";
     const theme = typeof day?.theme === "string" ? day.theme.trim().slice(0, MAX_THEME_LENGTH) : undefined;
     const rawTasks = Array.isArray(day?.tasks) ? day.tasks : [];
     const tasks = rawTasks
@@ -201,6 +218,7 @@ ${examGuideSection}
   "theme": "その日の学習テーマ",
   "tasks": ["具体的なタスク1", "具体的なタスク2"]
 }
+テーマ・タスクは必ず日本語で記述してください。
 `;
 
     const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "8000");
@@ -220,7 +238,7 @@ ${examGuideSection}
             {
               role: "system",
               content:
-                "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。",
+                "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を日本語の JSON で返してください。",
             },
             { role: "user", content: prompt },
           ],
