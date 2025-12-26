@@ -213,6 +213,30 @@ ${examGuideSection}
             },
             { role: "user", content: prompt },
           ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "study_plan",
+              schema: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["date", "theme", "tasks"],
+                  properties: {
+                    date: { type: "string" },
+                    theme: { type: "string" },
+                    tasks: {
+                      type: "array",
+                      items: { type: "string" },
+                      maxItems: 3,
+                    },
+                  },
+                },
+              },
+              strict: true,
+            },
+          },
           max_tokens: OPENAI_MAX_TOKENS,
         },
       );
