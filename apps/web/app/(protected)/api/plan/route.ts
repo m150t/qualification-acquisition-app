@@ -165,7 +165,10 @@ ${examGuideSection}
 }
 `;
 
-    const timeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "20000");
+    const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "8000");
+    const timeoutMs = Number.isFinite(rawTimeoutMs)
+      ? Math.min(Math.max(rawTimeoutMs, 1000), 60000)
+      : 8000;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
 
