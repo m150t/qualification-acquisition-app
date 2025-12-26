@@ -323,6 +323,7 @@ export default function Dashboard() {
     router.push('/goal');
   };
 
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* ===== Header ===== */}
@@ -549,6 +550,7 @@ export default function Dashboard() {
             </div>
           </div>
         </Card>
+
       </div>
 
       {/* ===== フッター ===== */}
