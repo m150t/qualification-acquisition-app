@@ -6,6 +6,7 @@ import {
   PutCommand,
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
+import type { WriteRequest } from "@aws-sdk/client-dynamodb";
 import { randomUUID } from "crypto";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
@@ -23,9 +24,6 @@ const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
 const MAX_DATE_LENGTH = 20;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-type DeleteRequestItem = {
-  DeleteRequest: { Key: { userId: string; date: string } };
-};
 
 function toDateOnlyString(d: Date): string {
   const year = d.getFullYear();
@@ -89,7 +87,7 @@ async function deleteUserReports(userId: string, requestId: string) {
   }
 
   for (const batch of batches) {
-    let unprocessed: DeleteRequestItem[] = batch.map((it) => ({
+    let unprocessed: WriteRequest[] = batch.map((it) => ({
       DeleteRequest: { Key: { userId: it.userId, date: it.date } },
     }));
     let attempts = 0;
@@ -101,9 +99,7 @@ async function deleteUserReports(userId: string, requestId: string) {
           },
         }),
       );
-      unprocessed =
-        (res.UnprocessedItems?.[REPORTS_TABLE] as DeleteRequestItem[] | undefined) ??
-        [];
+      unprocessed = res.UnprocessedItems?.[REPORTS_TABLE] ?? [];
       attempts += 1;
     }
   }
