@@ -206,20 +206,18 @@ export default function GoalSetting() {
   const [isLoadingGoal, setIsLoadingGoal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
-  const availableCertifications = useMemo(() => {
+  const availableCertifications = useMemo<Certification[]>(() => {
     const baseList =
       certifications.length > 0 ? certifications : FALLBACK_CERTIFICATIONS;
     if (baseList.some((cert) => cert.code === 'other')) {
       return baseList;
     }
-    return [
-      ...baseList,
-      {
-        code: 'other',
-        name: 'その他（自由入力）',
-        provider: 'other',
-      },
-    ];
+    const otherOption: Certification = {
+      code: 'other',
+      name: 'その他（自由入力）',
+      provider: 'other',
+    };
+    return [...baseList, otherOption];
   }, [certifications]);
 
   // 選択中資格
