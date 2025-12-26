@@ -1,34 +1,26 @@
-// apps/web/app/api/account/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 import {
   BatchWriteCommand,
   DeleteCommand,
   QueryCommand,
   ScanCommand,
-} from '@aws-sdk/lib-dynamodb';
-import { ddb } from '@/src/lib/dynamodb';
+} from "@aws-sdk/lib-dynamodb";
+import { ddb } from "@/src/lib/dynamodb";
+import { requireAuth } from "@/src/lib/authServer";
 
-const GOALS_TABLE = process.env.DDB_GOALS_TABLE || 'StudyGoals';
-const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || 'StudyReports';
+const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
+const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
 const CUSTOM_CERTIFICATIONS_TABLE =
-  process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || 'CustomCertifications';
-
-function getUserId(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
-  if (!userId) {
-    return null;
-  }
-  return userId;
-}
+  process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || "CustomCertifications";
 
 async function deleteReports(userId: string) {
   const res = await ddb.send(
     new QueryCommand({
       TableName: REPORTS_TABLE,
-      KeyConditionExpression: 'userId = :uid',
-      ExpressionAttributeValues: { ':uid': userId },
-      ProjectionExpression: 'userId, #d',
-      ExpressionAttributeNames: { '#d': 'date' },
+      KeyConditionExpression: "userId = :uid",
+      ExpressionAttributeValues: { ":uid": userId },
+      ProjectionExpression: "userId, #d",
+      ExpressionAttributeNames: { "#d": "date" },
     }),
   );
 
@@ -57,8 +49,8 @@ async function deleteCustomCertifications(userId: string) {
   const res = await ddb.send(
     new ScanCommand({
       TableName: CUSTOM_CERTIFICATIONS_TABLE,
-      FilterExpression: 'userId = :uid',
-      ExpressionAttributeValues: { ':uid': userId },
+      FilterExpression: "userId = :uid",
+      ExpressionAttributeValues: { ":uid": userId },
     }),
   );
 
@@ -86,31 +78,25 @@ async function deleteCustomCertifications(userId: string) {
 // DELETE: アカウント退会（全データ削除）
 export async function DELETE(req: NextRequest) {
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId header is required' },
-        { status: 401 },
-      );
+    const auth = await requireAuth(req);
+    if (!auth) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     await Promise.allSettled([
       ddb.send(
         new DeleteCommand({
           TableName: GOALS_TABLE,
-          Key: { userId },
+          Key: { userId: auth.userId },
         }),
       ),
-      deleteReports(userId),
-      deleteCustomCertifications(userId),
+      deleteReports(auth.userId),
+      deleteCustomCertifications(auth.userId),
     ]);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('account DELETE error', error);
-    return NextResponse.json(
-      { error: 'failed to delete account data' },
-      { status: 500 },
-    );
+    console.error("account DELETE error", error);
+    return NextResponse.json({ error: "failed to delete account data" }, { status: 500 });
   }
 }

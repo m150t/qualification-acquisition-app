@@ -2,7 +2,6 @@
 "use client";
 
 import { useState } from "react";
-import { useAuthenticator } from "@aws-amplify/ui-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -10,12 +9,10 @@ import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { ChevronLeft, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { getAuthHeaders } from "@/src/lib/authClient";
 
 export default function DailyReport() {
   const router = useRouter();
-  const { user } = useAuthenticator((context) => [context.user]);
-  const userId = user?.userId ?? user?.username ?? "";
-
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [date, setDate] = useState(todayStr);
@@ -29,21 +26,17 @@ export default function DailyReport() {
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   const handleSave = async () => {
-    if (!userId) {
-      setFeedbackError('ユーザー情報の取得に失敗しました。再度ログインしてください。');
-      return;
-    }
-
     setFeedbackError(null);
     setIsSaving(true);
 
     try {
+      const authHeaders = await getAuthHeaders();
       // ① 日報を DynamoDB に保存
       const reportRes = await fetch('/api/reports', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId,
+          ...authHeaders,
         },
         body: JSON.stringify({
           date,
@@ -67,7 +60,7 @@ export default function DailyReport() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId, 
+          ...authHeaders,
         },
         body: JSON.stringify({
           date,
@@ -95,7 +88,7 @@ export default function DailyReport() {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': userId,
+            ...authHeaders,
           },
           body: JSON.stringify({
             date,

@@ -2,8 +2,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAuthenticator } from "@aws-amplify/ui-react";
-import { deleteUser } from "aws-amplify/auth";
 import { useRouter } from "next/navigation";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -17,6 +15,7 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react';
+import { getAuthHeaders } from "@/src/lib/authClient";
 
 type StudyGoal = {
   certName: string;
@@ -27,7 +26,8 @@ type StudyGoal = {
 type DayPlan = {
   date: string;      // 'YYYY-MM-DD'
   theme: string;
-  topics: string[];
+  topics?: string[];
+  tasks?: string[];
 };
 
 type Report = {
@@ -55,12 +55,6 @@ function makeDateKey(d: Date): string {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, signOut } = useAuthenticator((context) => [
-    context.user,
-    context.signOut,
-  ]);
-  const userId = user?.userId ?? user?.username ?? '';
-
   const [goal, setGoal] = useState<StudyGoal | null>(null);
   const [tasks, setTasks] = useState<UiTask[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -81,7 +75,11 @@ export default function Dashboard() {
   // -----------------------------
   useEffect(() => {
     const fetchAll = async () => {
-      if (!userId) {
+      let authHeaders: Record<string, string>;
+      try {
+        authHeaders = await getAuthHeaders();
+      } catch (error) {
+        console.error("failed to load auth headers", error);
         setGoal(null);
         setTasks([]);
         setReports([]);
@@ -91,7 +89,7 @@ export default function Dashboard() {
       // 1. 目標＋計画
       try {
         const goalRes = await fetch('/api/goals', {
-          headers: { 'x-user-id': userId },
+          headers: authHeaders,
         });
         if (goalRes.ok) {
           const data = await goalRes.json();
@@ -112,7 +110,12 @@ export default function Dashboard() {
             );
 
             if (todayPlan) {
-              const uiTasks: UiTask[] = (todayPlan.topics ?? []).map(
+              const rawTopics = Array.isArray((todayPlan as any).topics)
+                ? (todayPlan as any).topics
+                : Array.isArray((todayPlan as any).tasks)
+                  ? (todayPlan as any).tasks
+                  : [];
+              const uiTasks: UiTask[] = rawTopics.map(
                 (t: string, idx: number) => ({
                   id: idx + 1,
                   title: t,
@@ -135,7 +138,7 @@ export default function Dashboard() {
       // 2. 日報一覧
       try {
         const repRes = await fetch('/api/reports', {
-          headers: { 'x-user-id': userId },
+          headers: authHeaders,
         });
         if (repRes.ok) {
           const data = await repRes.json();
@@ -151,7 +154,7 @@ export default function Dashboard() {
     };
 
     fetchAll();
-  }, [todayKey, userId]);
+  }, [todayKey]);
 
   // 日付ごと「勉強したか」
   const dateHasStudy = useMemo(() => {
@@ -280,23 +283,19 @@ export default function Dashboard() {
   };
 
   const clearUserData = async () => {
-    if (!userId) return;
+    const authHeaders = await getAuthHeaders();
     await fetch('/api/goals', {
       method: 'DELETE',
-      headers: { 'x-user-id': userId },
+      headers: authHeaders,
     }).catch((e) => console.error('failed to delete goal', e));
 
     await fetch('/api/reports', {
       method: 'DELETE',
-      headers: { 'x-user-id': userId },
+      headers: authHeaders,
     }).catch((e) => console.error('failed to delete reports', e));
   };
 
   const handlePassed = async () => {
-    if (!userId) {
-      alert('ユーザー情報の取得に失敗しました。再度ログインしてください。');
-      return;
-    }
     if (
       !window.confirm(
         '合格おめでとうございます！この試験に関するデータを削除します。よろしいですか？',
