@@ -23,6 +23,9 @@ const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
 const MAX_DATE_LENGTH = 20;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+type DeleteRequestItem = {
+  DeleteRequest: { Key: { userId: string; date: string } };
+};
 
 function toDateOnlyString(d: Date): string {
   const year = d.getFullYear();
@@ -86,7 +89,7 @@ async function deleteUserReports(userId: string, requestId: string) {
   }
 
   for (const batch of batches) {
-    let unprocessed = batch.map((it) => ({
+    let unprocessed: DeleteRequestItem[] = batch.map((it) => ({
       DeleteRequest: { Key: { userId: it.userId, date: it.date } },
     }));
     let attempts = 0;
@@ -98,7 +101,9 @@ async function deleteUserReports(userId: string, requestId: string) {
           },
         }),
       );
-      unprocessed = res.UnprocessedItems?.[REPORTS_TABLE] ?? [];
+      unprocessed =
+        (res.UnprocessedItems?.[REPORTS_TABLE] as DeleteRequestItem[] | undefined) ??
+        [];
       attempts += 1;
     }
   }
