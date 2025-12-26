@@ -4,6 +4,7 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
+import { hash8, log } from "@/src/lib/logger";
 
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
@@ -101,13 +102,13 @@ function parsePlanFromText(text: string, requestId: string): PlanDay[] {
     if (start >= 0 && end > start) {
       const slice = text.slice(start, end + 1);
       try {
-        console.warn("plan api json fallback parse", { requestId });
+        log("warn", "plan api json fallback parse", { requestId });
         return extractPlanPayload(JSON.parse(slice));
       } catch (innerError) {
-        console.error("plan api json fallback failed", innerError);
+        log("error", "plan api json fallback failed", { requestId, error: String(innerError) });
       }
     }
-    console.error("failed to parse plan JSON", error);
+    log("error", "failed to parse plan JSON", { requestId, error: String(error) });
     return [];
   }
 }
@@ -124,7 +125,7 @@ async function fetchExamGuide(certCode?: string): Promise<string | null> {
     const item = res.Item as { examGuide?: ExamGuide; examGuideText?: string } | undefined;
     return formatExamGuide(item?.examGuide ?? item?.examGuideText);
   } catch (error) {
-    console.error("failed to load exam guide", error);
+    log("error", "failed to load exam guide", { error: String(error), certCode });
     return null;
   }
 }
@@ -134,7 +135,6 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-request-id") ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const requestStartedAt = Date.now();
   try {
-    console.log("plan api start", { requestId });
     const auth = await requireAuth(req);
     if (!auth) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -154,6 +154,12 @@ export async function POST(req: NextRequest) {
     const limiter = rateLimit(`plan:${auth.userId}:${ip}`, { limit: 5, windowMs: 60_000 });
     if (!limiter.ok) {
       const retryAfter = Math.max(1, Math.ceil((limiter.resetAt - Date.now()) / 1000));
+      log("warn", "plan rate limit", {
+        requestId,
+        userIdHash: hash8(auth.userId),
+        ip,
+        retryAfter,
+      });
       return NextResponse.json(
         { error: "rate limit exceeded" },
         { status: 429, headers: { "Retry-After": retryAfter.toString() } },
@@ -175,11 +181,7 @@ export async function POST(req: NextRequest) {
 
     const examGuideStartedAt = Date.now();
     const examGuide = await fetchExamGuide(goal.certCode);
-    console.log("plan api exam guide fetched", {
-      requestId,
-      elapsedMs: Date.now() - examGuideStartedAt,
-      hasExamGuide: Boolean(examGuide),
-    });
+    const examGuideElapsedMs = Date.now() - examGuideStartedAt;
     const examGuideSection = examGuide
       ? `\n試験ガイド情報:\n${examGuide}\n`
       : "\n試験ガイド情報: 未登録\n";
@@ -256,13 +258,15 @@ ${examGuideSection}
           max_tokens: OPENAI_MAX_TOKENS,
         },
       );
-      console.log("plan api openai completed", {
+      log("info", "plan api openai completed", {
         requestId,
         elapsedMs: Date.now() - openAiStartedAt,
+        model: completion.model,
+        finishReason: completion.choices?.[0]?.finish_reason,
       });
     } catch (error) {
       if (ac.signal.aborted || isAbortError(error)) {
-        console.warn("plan api openai timeout", {
+        log("warn", "plan api openai timeout", {
           requestId,
           elapsedMs: Date.now() - requestStartedAt,
           timeoutMs,
@@ -280,15 +284,18 @@ ${examGuideSection}
 
     const plan = parsePlanFromText(text, requestId);
 
-    console.log("plan api success", {
+    log("info", "plan api success", {
       requestId,
+      userIdHash: hash8(auth.userId),
       elapsedMs: Date.now() - requestStartedAt,
       planDays: plan.length,
+      hasExamGuide: Boolean(examGuide),
+      examGuideElapsedMs,
     });
     return NextResponse.json({ plan });
   } catch (e: unknown) {
     if (isAbortError(e)) {
-      console.warn("plan api aborted", {
+      log("warn", "plan api aborted", {
         requestId,
         elapsedMs: Date.now() - requestStartedAt,
       });
@@ -297,7 +304,7 @@ ${examGuideSection}
         warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
       });
     }
-    console.error("plan api error", e);
+    log("error", "plan api error", { requestId, error: String(e) });
     return NextResponse.json(
       {
         error: "学習計画の生成に失敗しました",

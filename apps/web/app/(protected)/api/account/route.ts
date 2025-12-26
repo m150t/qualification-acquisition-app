@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   BatchWriteCommand,
@@ -7,6 +8,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
+import { hash8, log } from "@/src/lib/logger";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
@@ -77,6 +79,7 @@ async function deleteCustomCertifications(userId: string) {
 
 // DELETE: アカウント退会（全データ削除）
 export async function DELETE(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -94,9 +97,10 @@ export async function DELETE(req: NextRequest) {
       deleteCustomCertifications(auth.userId),
     ]);
 
-    return NextResponse.json({ ok: true });
+    log("info", "account delete success", { requestId, userIdHash: hash8(auth.userId) });
+    return NextResponse.json({ ok: true, requestId });
   } catch (error) {
-    console.error("account DELETE error", error);
-    return NextResponse.json({ error: "failed to delete account data" }, { status: 500 });
+    log("error", "account DELETE error", { requestId, error: String(error) });
+    return NextResponse.json({ error: "failed to delete account data", requestId }, { status: 500 });
   }
 }

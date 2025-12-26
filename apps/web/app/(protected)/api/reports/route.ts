@@ -1,7 +1,9 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { BatchWriteCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
+import { hash8, log } from "@/src/lib/logger";
 
 const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
 const MAX_CONTENT_LENGTH = 4000;
@@ -17,6 +19,7 @@ function safeNumber(value: unknown): number | null {
 // POST（日報保存）
 // ----------------------
 export async function POST(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -62,10 +65,16 @@ export async function POST(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ ok: true });
+    log("info", "reports post success", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      date,
+      hasAiComment: Boolean(body.aiComment),
+    });
+    return NextResponse.json({ ok: true, requestId });
   } catch (e) {
-    console.error("reports POST error", e);
-    return NextResponse.json({ error: "failed to save report" }, { status: 500 });
+    log("error", "reports POST error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to save report", requestId }, { status: 500 });
   }
 }
 
@@ -73,6 +82,7 @@ export async function POST(req: NextRequest) {
 // GET（日報一覧）
 // ----------------------
 export async function GET(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -104,10 +114,15 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ reports });
+    log("info", "reports get success", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      reportCount: reports.length,
+    });
+    return NextResponse.json({ reports, requestId });
   } catch (e) {
-    console.error("reports GET error", e);
-    return NextResponse.json({ error: "failed to load reports" }, { status: 500 });
+    log("error", "reports GET error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to load reports", requestId }, { status: 500 });
   }
 }
 
@@ -115,6 +130,7 @@ export async function GET(req: NextRequest) {
 // DELETE（日報一括削除・試験終了時）
 // ----------------------
 export async function DELETE(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -133,7 +149,8 @@ export async function DELETE(req: NextRequest) {
 
     const items = res.Items ?? [];
     if (!items.length) {
-      return NextResponse.json({ ok: true });
+      log("info", "reports delete empty", { requestId, userIdHash: hash8(auth.userId) });
+      return NextResponse.json({ ok: true, requestId });
     }
 
     const batches: typeof items[] = [];
@@ -153,16 +170,22 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ ok: true });
+    log("info", "reports delete success", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      deleted: items.length,
+    });
+    return NextResponse.json({ ok: true, requestId });
   } catch (e) {
-    console.error("reports DELETE error", e);
-    return NextResponse.json({ error: "failed to delete reports" }, { status: 500 });
+    log("error", "reports DELETE error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to delete reports", requestId }, { status: 500 });
   }
 }
 // ----------------------
 // PATCH（AIコメント更新）
 // ----------------------
 export async function PATCH(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -215,9 +238,15 @@ export async function PATCH(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ ok: true });
+    log("info", "reports patch success", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      date,
+      aiCommentLength: String(aiComment).length,
+    });
+    return NextResponse.json({ ok: true, requestId });
   } catch (e) {
-    console.error("reports PATCH error", e);
-    return NextResponse.json({ error: "failed to update report" }, { status: 500 });
+    log("error", "reports PATCH error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to update report", requestId }, { status: 500 });
   }
 }

@@ -1,13 +1,16 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 import type { Certification } from "@/src/lib/certifications";
 import { requireAuth } from "@/src/lib/authServer";
+import { hash8, log } from "@/src/lib/logger";
 
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 
 export async function GET(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -39,11 +42,16 @@ export async function GET(req: NextRequest) {
 
     certifications.sort((a, b) => a.name.localeCompare(b.name, "ja"));
 
-    return NextResponse.json({ certifications });
+    log("info", "certifications get success", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      count: certifications.length,
+    });
+    return NextResponse.json({ certifications, requestId });
   } catch (error) {
-    console.error("certifications GET error", error);
+    log("error", "certifications GET error", { requestId, error: String(error) });
     return NextResponse.json(
-      { error: "failed to load certifications" },
+      { error: "failed to load certifications", requestId },
       { status: 500 },
     );
   }

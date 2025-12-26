@@ -5,6 +5,7 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
+import { hash8, log } from "@/src/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,14 +15,6 @@ const MODEL = "gpt-4.1-mini";
 const MAX_CONTENT_LENGTH = 4000;
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
-function hash8(s: string) {
-  return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
-}
-
-function log(level: "info" | "warn" | "error", msg: string, meta: Record<string, any>) {
-  console[level](JSON.stringify({ level, msg, time: new Date().toISOString(), ...meta }));
-}
 
 function safeNumber(v: any): number | null {
   const n = typeof v === "string" ? Number(v) : v;
@@ -59,6 +52,12 @@ export async function POST(req: NextRequest) {
     const limiter = rateLimit(`feedback:${auth.userId}:${ip}`, { limit: 10, windowMs: 60_000 });
     if (!limiter.ok) {
       const retryAfter = Math.max(1, Math.ceil((limiter.resetAt - Date.now()) / 1000));
+      log("warn", "feedback rate limit", {
+        requestId,
+        userIdHash: hash8(auth.userId),
+        ip,
+        retryAfter,
+      });
       return NextResponse.json(
         { error: "rate limit exceeded" },
         { status: 429, headers: { "Retry-After": retryAfter.toString() } },
@@ -170,6 +169,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ comment: "今日はここまででも十分！次は計画と照らして1点だけ復習しよう。", requestId });
     }
 
-    return NextResponse.json({ error: "AIコメント生成に失敗しました", detail: message, requestId }, { status: 500 });
+    return NextResponse.json({ error: "AIコメント生成に失敗しました", requestId }, { status: 500 });
   }
 }

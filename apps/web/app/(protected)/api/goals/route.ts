@@ -3,6 +3,7 @@ import { DeleteCommand, PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
+import { hash8, log } from "@/src/lib/logger";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const CUSTOM_CERTIFICATIONS_TABLE =
@@ -30,6 +31,7 @@ function normalizePlan(plan: unknown) {
 
 // POST: 目標＋日付ベースの計画を保存
 export async function POST(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -75,19 +77,25 @@ export async function POST(req: NextRequest) {
           }),
         );
       } catch (error) {
-        console.error("failed to save custom certification", error);
+        log("error", "failed to save custom certification", {
+          requestId,
+          userIdHash: hash8(auth.userId),
+          error: String(error),
+        });
       }
     }
 
-    return NextResponse.json({ ok: true });
+    log("info", "goals post success", { requestId, userIdHash: hash8(auth.userId) });
+    return NextResponse.json({ ok: true, requestId });
   } catch (e) {
-    console.error("goals POST error", e);
-    return NextResponse.json({ error: "failed to save goal" }, { status: 500 });
+    log("error", "goals POST error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to save goal", requestId }, { status: 500 });
   }
 }
 
 // GET: 目標＋計画を取得
 export async function GET(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -102,22 +110,30 @@ export async function GET(req: NextRequest) {
     );
 
     if (!res.Item) {
-      return NextResponse.json({ goal: null, plan: [] });
+      log("info", "goals get empty", { requestId, userIdHash: hash8(auth.userId) });
+      return NextResponse.json({ goal: null, plan: [], requestId });
     }
 
     const { plan, ...goal } = res.Item;
+    log("info", "goals get success", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      planDays: Array.isArray(plan) ? plan.length : 0,
+    });
     return NextResponse.json({
       goal,
       plan: Array.isArray(plan) ? plan : [],
+      requestId,
     });
   } catch (e) {
-    console.error("goals GET error", e);
-    return NextResponse.json({ error: "failed to load goal" }, { status: 500 });
+    log("error", "goals GET error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to load goal", requestId }, { status: 500 });
   }
 }
 
 // DELETE: 目標と計画を削除（試験終了後のリセット用途）
 export async function DELETE(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? randomUUID();
   try {
     const auth = await requireAuth(req);
     if (!auth) {
@@ -131,9 +147,10 @@ export async function DELETE(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ ok: true });
+    log("info", "goals delete success", { requestId, userIdHash: hash8(auth.userId) });
+    return NextResponse.json({ ok: true, requestId });
   } catch (e) {
-    console.error("goals DELETE error", e);
-    return NextResponse.json({ error: "failed to delete goal" }, { status: 500 });
+    log("error", "goals DELETE error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to delete goal", requestId }, { status: 500 });
   }
 }
