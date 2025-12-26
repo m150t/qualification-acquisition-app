@@ -22,12 +22,27 @@ const MAX_TASKS_PER_DAY = 20;
 const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
 const MAX_DATE_LENGTH = 20;
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function normalizeDateString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (DATE_ONLY_REGEX.test(trimmed)) return trimmed;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return trimmed.slice(0, MAX_DATE_LENGTH);
+  }
+  parsed.setHours(0, 0, 0, 0);
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function normalizePlan(plan: unknown) {
   if (!Array.isArray(plan)) return [];
   return plan.slice(0, MAX_PLAN_DAYS).map((day) => {
-    const date =
-      typeof day?.date === "string" ? day.date.trim().slice(0, MAX_DATE_LENGTH) : "";
+    const date = typeof day?.date === "string" ? normalizeDateString(day.date) : "";
     const theme =
       typeof day?.theme === "string"
         ? day.theme.trim().slice(0, MAX_THEME_LENGTH)
@@ -95,6 +110,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const plan = normalizePlan(body.plan);
+    const resetReports = Boolean(body.resetReports);
 
     const item = {
       userId: auth.userId,
@@ -115,6 +131,10 @@ export async function POST(req: NextRequest) {
         Item: item,
       }),
     );
+
+    if (resetReports) {
+      await deleteUserReports(auth.userId, requestId);
+    }
 
     if (body.certCode === "other" && body.certName) {
       try {
