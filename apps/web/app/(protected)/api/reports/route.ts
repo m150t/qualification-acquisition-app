@@ -137,17 +137,27 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const res = await ddb.send(
-      new QueryCommand({
-        TableName: REPORTS_TABLE,
-        KeyConditionExpression: "userId = :uid",
-        ExpressionAttributeValues: { ":uid": auth.userId },
-        ProjectionExpression: "userId, #d",
-        ExpressionAttributeNames: { "#d": "date" },
-      }),
-    );
+    const items: Array<{ userId: string; date: string }> = [];
+    let lastKey: Record<string, any> | undefined;
 
-    const items = res.Items ?? [];
+    do {
+      const res = await ddb.send(
+        new QueryCommand({
+          TableName: REPORTS_TABLE,
+          KeyConditionExpression: "userId = :uid",
+          ExpressionAttributeValues: { ":uid": auth.userId },
+          ProjectionExpression: "userId, #d",
+          ExpressionAttributeNames: { "#d": "date" },
+          ExclusiveStartKey: lastKey,
+        }),
+      );
+
+      if (res.Items) {
+        items.push(...(res.Items as Array<{ userId: string; date: string }>));
+      }
+      lastKey = res.LastEvaluatedKey;
+    } while (lastKey);
+
     if (!items.length) {
       log("info", "reports delete empty", { requestId, userIdHash: hash8(auth.userId) });
       return NextResponse.json({ ok: true, requestId });
@@ -159,15 +169,22 @@ export async function DELETE(req: NextRequest) {
     }
 
     for (const batch of batches) {
-      await ddb.send(
-        new BatchWriteCommand({
-          RequestItems: {
-            [REPORTS_TABLE]: batch.map((it) => ({
-              DeleteRequest: { Key: { userId: it.userId, date: it.date } },
-            })),
-          },
-        }),
-      );
+      let unprocessed = batch.map((it) => ({
+        DeleteRequest: { Key: { userId: it.userId, date: it.date } },
+      }));
+
+      let attempts = 0;
+      while (unprocessed.length > 0 && attempts < 5) {
+        const res = await ddb.send(
+          new BatchWriteCommand({
+            RequestItems: {
+              [REPORTS_TABLE]: unprocessed,
+            },
+          }),
+        );
+        unprocessed = res.UnprocessedItems?.[REPORTS_TABLE] ?? [];
+        attempts += 1;
+      }
     }
 
     log("info", "reports delete success", {
