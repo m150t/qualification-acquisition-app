@@ -1,5 +1,6 @@
-import HowTo from "@/components/HowTo";
+import HowTo from "../../../src/components/HowTo";
 
 export default function Page() {
   return <HowTo />;
 }
+
