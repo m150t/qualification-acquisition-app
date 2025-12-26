@@ -6,7 +6,7 @@ import { Card } from './ui/card';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { ChevronLeft, Sparkles, Calendar, Check, Edit2 } from 'lucide-react';
-import { useAuthenticator } from '@aws-amplify/ui-react';
+import { getAuthHeaders } from '@/src/lib/authClient';
 
 import {
   FALLBACK_CERTIFICATIONS,
@@ -180,9 +180,6 @@ function buildFallbackPlan(examDate: string, certCode: string): DayPlan[] {
 export default function GoalSetting() {
   // ステップ
   const [step, setStep] = useState(1);
-  const { user } = useAuthenticator((context) => [context.user]);
-  const userId = user?.userId ?? user?.username ?? '';
-
   // 資格関連
   const [selectedCertCode, setSelectedCertCode] = useState<string>('aws-saa');
   const [customCertName, setCustomCertName] = useState('');
@@ -270,7 +267,10 @@ export default function GoalSetting() {
     const loadCertifications = async () => {
       try {
         setIsLoadingCertifications(true);
-        const res = await fetch('/api/certifications');
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch('/api/certifications', {
+          headers: authHeaders,
+        });
         if (!res.ok) {
           console.error('failed to load certifications', await res.text());
           return;
@@ -292,15 +292,11 @@ export default function GoalSetting() {
   // 既存の目標取得
   useEffect(() => {
     const loadGoal = async () => {
-      if (!userId) {
-        setExistingGoal(null);
-        return;
-      }
-
       try {
         setIsLoadingGoal(true);
+        const authHeaders = await getAuthHeaders();
         const res = await fetch('/api/goals', {
-          headers: { 'x-user-id': userId },
+          headers: authHeaders,
         });
 
         if (!res.ok) {
@@ -328,7 +324,7 @@ export default function GoalSetting() {
     };
 
     loadGoal();
-  }, [userId]);
+  }, []);
 
   // ==== 計画生成（日付ベース） ====
   const handleGeneratePlan = async () => {
@@ -354,10 +350,12 @@ export default function GoalSetting() {
     let generatedPlan: DayPlan[] | null = null;
 
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/plan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders,
         },
         body: JSON.stringify({
           goal: {
@@ -406,11 +404,6 @@ export default function GoalSetting() {
       return;
     }
 
-    if (!userId) {
-      alert('ユーザー情報の取得に失敗しました。再度ログインしてください。');
-      return;
-    }
-
     if (
       existingGoal &&
       !window.confirm(
@@ -453,11 +446,12 @@ export default function GoalSetting() {
     };
 
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/goals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId,
+          ...authHeaders,
         },
         body: JSON.stringify(payload),
       });

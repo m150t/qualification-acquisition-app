@@ -1,22 +1,25 @@
-// apps/web/app/api/plan/route.ts
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import { GetCommand } from '@aws-sdk/lib-dynamodb';
-import { ddb } from '@/src/lib/dynamodb';
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { ddb } from "@/src/lib/dynamodb";
+import { requireAuth } from "@/src/lib/authServer";
+import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 const CERTIFICATIONS_TABLE =
-  process.env.DDB_CERTIFICATIONS_TABLE || 'Certifications';
+  process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
+const MAX_CERT_NAME_LENGTH = 200;
+const MAX_EXAM_DATE_LENGTH = 20;
 
 type GeneratePlanRequest = {
   goal: {
     certCode?: string;
     certName: string;
-    examDate: string;      // YYYY-MM-DD
-    weeklyHours: number | null;   // 目標学習時間（時間）
+    examDate: string; // YYYY-MM-DD
+    weeklyHours: number | null; // 目標学習時間（時間）
   };
 };
 
@@ -31,17 +34,17 @@ type ExamGuide =
 
 function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (!guide) return null;
-  if (typeof guide === 'string') {
+  if (typeof guide === "string") {
     return guide.trim() || null;
   }
   const lines: string[] = [];
   if (guide.summary) lines.push(`概要: ${guide.summary}`);
   if (Array.isArray(guide.topics) && guide.topics.length > 0) {
-    lines.push(`主要トピック:\n- ${guide.topics.join('\n- ')}`);
+    lines.push(`主要トピック:\n- ${guide.topics.join("\n- ")}`);
   }
   if (guide.notes) lines.push(`備考: ${guide.notes}`);
   if (guide.sourceUrl) lines.push(`参照URL: ${guide.sourceUrl}`);
-  const formatted = lines.join('\n');
+  const formatted = lines.join("\n");
   return formatted.trim() || null;
 }
 
@@ -57,19 +60,37 @@ async function fetchExamGuide(certCode?: string): Promise<string | null> {
     const item = res.Item as { examGuide?: ExamGuide; examGuideText?: string } | undefined;
     return formatExamGuide(item?.examGuide ?? item?.examGuideText);
   } catch (error) {
-    console.error('failed to load exam guide', error);
+    console.error("failed to load exam guide", error);
     return null;
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const ip = getClientIp(req.headers);
+    const limiter = rateLimit(`plan:${auth.userId}:${ip}`, { limit: 5, windowMs: 60_000 });
+    if (!limiter.ok) {
+      const retryAfter = Math.max(1, Math.ceil((limiter.resetAt - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: "rate limit exceeded" },
+        { status: 429, headers: { "Retry-After": retryAfter.toString() } },
+      );
+    }
+
     const body = (await req.json()) as GeneratePlanRequest;
     const { goal } = body;
 
-    if (!goal?.certName || !goal?.examDate) {
+    const certName = String(goal?.certName ?? "").trim().slice(0, MAX_CERT_NAME_LENGTH);
+    const examDate = String(goal?.examDate ?? "").trim().slice(0, MAX_EXAM_DATE_LENGTH);
+
+    if (!certName || !examDate) {
       return NextResponse.json(
-        { error: 'goal.certName と goal.examDate は必須です' },
+        { error: "goal.certName と goal.examDate は必須です" },
         { status: 400 },
       );
     }
@@ -77,12 +98,12 @@ export async function POST(req: Request) {
     const examGuide = await fetchExamGuide(goal.certCode);
     const examGuideSection = examGuide
       ? `\n試験ガイド情報:\n${examGuide}\n`
-      : '\n試験ガイド情報: 未登録\n';
+      : "\n試験ガイド情報: 未登録\n";
 
     const prompt = `
-資格名: ${goal.certName}
-試験日: ${goal.examDate}
-目標の学習時間: ${goal.weeklyHours ?? '未設定'} 時間
+資格名: ${certName}
+試験日: ${examDate}
+目標の学習時間: ${goal.weeklyHours ?? "未設定"} 時間
 ${examGuideSection}
 
 上記をもとに、試験日までの学習計画を立ててください。
@@ -95,21 +116,19 @@ ${examGuideSection}
 `;
 
     const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: "gpt-4.1-mini",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content:
-            'あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。',
+            "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。",
         },
-        { role: 'user', content: prompt },
+        { role: "user", content: prompt },
       ],
     });
 
     const msg = completion.choices[0]?.message;
-    const text = (msg?.content ?? '').toString().trim();
-
-    console.log('plan raw message', msg);
+    const text = (msg?.content ?? "").toString().trim();
 
     let plan: Array<Record<string, unknown>> = [];
 
@@ -121,17 +140,17 @@ ${examGuideSection}
         }
       }
     } catch (e) {
-      console.error('failed to parse plan JSON', e, text);
+      console.error("failed to parse plan JSON", e);
       // パース失敗時は空配列で返す
       plan = [];
     }
 
     return NextResponse.json({ plan });
   } catch (e: unknown) {
-    console.error('plan api error', e);
+    console.error("plan api error", e);
     return NextResponse.json(
       {
-        error: '学習計画の生成に失敗しました',
+        error: "学習計画の生成に失敗しました",
         detail: e instanceof Error ? e.message : String(e),
       },
       { status: 500 },

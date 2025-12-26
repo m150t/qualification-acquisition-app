@@ -7,6 +7,7 @@ import outputs from "../amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
 import { Authenticator } from "@aws-amplify/ui-react";
 import { deleteUser } from "aws-amplify/auth";
+import { getAuthHeaders } from "@/src/lib/authClient";
 
 // クライアント側で Amplify を初期化
 Amplify.configure(outputs);
@@ -34,22 +35,18 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         },
       }}
     >
-      {({ signOut, user }) => {
-        const userId = user?.userId ?? user?.username ?? "";
+      {({ signOut }) => {
         const handleDeleteAccount = async () => {
-          if (!userId) {
-            alert("ユーザー情報の取得に失敗しました。再度ログインしてください。");
-            return;
-          }
           if (!window.confirm("データが削除されますがよろしいですか？")) {
             return;
           }
 
           setIsDeletingAccount(true);
           try {
+            const authHeaders = await getAuthHeaders();
             const res = await fetch("/api/account", {
               method: "DELETE",
-              headers: { "x-user-id": userId },
+              headers: authHeaders,
             });
             if (!res.ok) {
               const message = await res.text();

@@ -1,16 +1,16 @@
-// apps/web/app/api/reports/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { BatchWriteCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { ddb } from '@/src/lib/dynamodb';
+import { NextRequest, NextResponse } from "next/server";
+import { BatchWriteCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { ddb } from "@/src/lib/dynamodb";
+import { requireAuth } from "@/src/lib/authServer";
 
-const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || 'StudyReports';
+const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
+const MAX_CONTENT_LENGTH = 4000;
+const MAX_DATE_LENGTH = 20;
 
-function getUserId(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
-  if (!userId) {
-    return null;
-  }
-  return userId;
+function safeNumber(value: unknown): number | null {
+  const n = typeof value === "string" ? Number(value) : value;
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  return null;
 }
 
 // ----------------------
@@ -18,40 +18,39 @@ function getUserId(req: NextRequest) {
 // ----------------------
 export async function POST(req: NextRequest) {
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId header is required' },
-        { status: 401 },
-      );
+    const auth = await requireAuth(req);
+    if (!auth) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
 
-    const date: string = body.date;
-    if (!date) {
-      return NextResponse.json({ error: 'date is required' }, { status: 400 });
+    const date = String(body.date ?? "").trim();
+    if (!date || date.length > MAX_DATE_LENGTH) {
+      return NextResponse.json({ error: "date is required" }, { status: 400 });
     }
 
-    const studyTime =
-      body.studyTime === '' || body.studyTime == null
-        ? null
-        : Number(body.studyTime);
+    const studyTime = safeNumber(body.studyTime);
+    const tasksCompleted = safeNumber(body.tasksCompleted);
 
-    const tasksCompleted =
-      body.tasksCompleted === '' || body.tasksCompleted == null
-        ? null
-        : Number(body.tasksCompleted);
+    if (studyTime != null && studyTime < 0) {
+      return NextResponse.json({ error: "studyTime must be >= 0" }, { status: 400 });
+    }
+    if (tasksCompleted != null && tasksCompleted < 0) {
+      return NextResponse.json({ error: "tasksCompleted must be >= 0" }, { status: 400 });
+    }
+
+    const content = String(body.content ?? "").slice(0, MAX_CONTENT_LENGTH);
 
     const savedAt = new Date().toISOString();
 
     const item = {
-      userId,
+      userId: auth.userId,
       date: `${date}#${savedAt}`,
       reportDate: date,
       studyTime,
       tasksCompleted,
-      content: body.content ?? '',
+      content,
       aiComment: body.aiComment ?? null,
       savedAt,
     };
@@ -65,11 +64,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error('reports POST error', e);
-    return NextResponse.json(
-      { error: 'failed to save report' },
-      { status: 500 },
-    );
+    console.error("reports POST error", e);
+    return NextResponse.json({ error: "failed to save report" }, { status: 500 });
   }
 }
 
@@ -78,20 +74,17 @@ export async function POST(req: NextRequest) {
 // ----------------------
 export async function GET(req: NextRequest) {
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId header is required' },
-        { status: 401 },
-      );
+    const auth = await requireAuth(req);
+    if (!auth) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const res = await ddb.send(
       new QueryCommand({
         TableName: REPORTS_TABLE,
-        KeyConditionExpression: 'userId = :uid',
+        KeyConditionExpression: "userId = :uid",
         ExpressionAttributeValues: {
-          ':uid': userId,
+          ":uid": auth.userId,
         },
         ScanIndexForward: false,
       }),
@@ -99,11 +92,11 @@ export async function GET(req: NextRequest) {
 
     const reports = (res.Items ?? []).map((item) => {
       const baseDate =
-        typeof item.reportDate === 'string'
+        typeof item.reportDate === "string"
           ? item.reportDate
-          : typeof item.date === 'string'
-            ? item.date.split('#')[0] ?? item.date
-            : '';
+          : typeof item.date === "string"
+            ? item.date.split("#")[0] ?? item.date
+            : "";
 
       return {
         ...item,
@@ -113,11 +106,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ reports });
   } catch (e) {
-    console.error('reports GET error', e);
-    return NextResponse.json(
-      { error: 'failed to load reports' },
-      { status: 500 },
-    );
+    console.error("reports GET error", e);
+    return NextResponse.json({ error: "failed to load reports" }, { status: 500 });
   }
 }
 
@@ -126,21 +116,18 @@ export async function GET(req: NextRequest) {
 // ----------------------
 export async function DELETE(req: NextRequest) {
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId header is required' },
-        { status: 401 },
-      );
+    const auth = await requireAuth(req);
+    if (!auth) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const res = await ddb.send(
       new QueryCommand({
         TableName: REPORTS_TABLE,
-        KeyConditionExpression: 'userId = :uid',
-        ExpressionAttributeValues: { ':uid': userId },
-        ProjectionExpression: 'userId, #d',
-        ExpressionAttributeNames: { '#d': 'date' },
+        KeyConditionExpression: "userId = :uid",
+        ExpressionAttributeValues: { ":uid": auth.userId },
+        ProjectionExpression: "userId, #d",
+        ExpressionAttributeNames: { "#d": "date" },
       }),
     );
 
@@ -168,11 +155,8 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error('reports DELETE error', e);
-    return NextResponse.json(
-      { error: 'failed to delete reports' },
-      { status: 500 },
-    );
+    console.error("reports DELETE error", e);
+    return NextResponse.json({ error: "failed to delete reports" }, { status: 500 });
   }
 }
 // ----------------------
@@ -180,48 +164,60 @@ export async function DELETE(req: NextRequest) {
 // ----------------------
 export async function PATCH(req: NextRequest) {
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return NextResponse.json({ error: 'userId header is required' }, { status: 401 });
+    const auth = await requireAuth(req);
+    if (!auth) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
     const { date, aiComment } = body;
 
     if (!date || !aiComment) {
-      return NextResponse.json({ error: 'date and aiComment are required' }, { status: 400 });
+      return NextResponse.json({ error: "date and aiComment are required" }, { status: 400 });
     }
 
-    // 最新の1件（同日）を取得
+    if (String(aiComment).length > MAX_CONTENT_LENGTH) {
+      return NextResponse.json({ error: "aiComment is too long" }, { status: 400 });
+    }
+
     const res = await ddb.send(
       new QueryCommand({
         TableName: REPORTS_TABLE,
-        KeyConditionExpression: 'userId = :uid',
-        ExpressionAttributeValues: { ':uid': userId },
+        KeyConditionExpression: "userId = :uid",
+        ExpressionAttributeValues: { ":uid": auth.userId },
         ScanIndexForward: false,
-        Limit: 1,
       }),
     );
 
-    const item = res.Items?.[0];
-    if (!item) {
-      return NextResponse.json({ error: 'report not found' }, { status: 404 });
+    const items = res.Items ?? [];
+    const target = items.find((item) => {
+      const baseDate =
+        typeof item.reportDate === "string"
+          ? item.reportDate
+          : typeof item.date === "string"
+            ? item.date.split("#")[0] ?? item.date
+            : "";
+      return baseDate === date;
+    });
+
+    if (!target) {
+      return NextResponse.json({ error: "report not found" }, { status: 404 });
     }
 
     await ddb.send(
       new UpdateCommand({
         TableName: REPORTS_TABLE,
-        Key: { userId, date: item.date },
-        UpdateExpression: 'SET aiComment = :c',
+        Key: { userId: target.userId, date: target.date },
+        UpdateExpression: "SET aiComment = :c",
         ExpressionAttributeValues: {
-          ':c': aiComment,
+          ":c": aiComment,
         },
       }),
     );
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error('reports PATCH error', e);
-    return NextResponse.json({ error: 'failed to update report' }, { status: 500 });
+    console.error("reports PATCH error", e);
+    return NextResponse.json({ error: "failed to update report" }, { status: 500 });
   }
 }

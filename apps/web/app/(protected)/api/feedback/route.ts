@@ -3,18 +3,17 @@ import OpenAI from "openai";
 import crypto from "crypto";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/src/lib/dynamodb";
+import { requireAuth } from "@/src/lib/authServer";
+import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const MODEL = "gpt-4.1-mini";
+const MAX_CONTENT_LENGTH = 4000;
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
-function getUserId(req: NextRequest) {
-  return req.headers.get("x-user-id");
-}
 
 function hash8(s: string) {
   return crypto.createHash("sha256").update(s).digest("hex").slice(0, 8);
@@ -53,11 +52,21 @@ export async function POST(req: NextRequest) {
   const start = Date.now();
 
   try {
-    const userId = getUserId(req);
-    if (!userId) return NextResponse.json({ error: "userId header is required" }, { status: 401 });
+    const auth = await requireAuth(req);
+    if (!auth) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+    const ip = getClientIp(req.headers);
+    const limiter = rateLimit(`feedback:${auth.userId}:${ip}`, { limit: 10, windowMs: 60_000 });
+    if (!limiter.ok) {
+      const retryAfter = Math.max(1, Math.ceil((limiter.resetAt - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: "rate limit exceeded" },
+        { status: 429, headers: { "Retry-After": retryAfter.toString() } },
+      );
+    }
 
     if (!process.env.OPENAI_API_KEY) {
-      log("error", "OPENAI_API_KEY missing", { requestId, userIdHash: hash8(userId) });
+      log("error", "OPENAI_API_KEY missing", { requestId, userIdHash: hash8(auth.userId) });
       return NextResponse.json({ error: "Server misconfigured", requestId }, { status: 500 });
     }
 
@@ -68,10 +77,20 @@ export async function POST(req: NextRequest) {
     const tasksCompleted = safeNumber(body.tasksCompleted);
 
     if (!content || !date) return NextResponse.json({ error: "content and date are required" }, { status: 400 });
+    if (content.length > MAX_CONTENT_LENGTH) {
+      return NextResponse.json({ error: "content is too long" }, { status: 400 });
+    }
 
-    log("info", "feedback input", { requestId, userIdHash: hash8(userId), date, studyTime, tasksCompleted, contentLen: content.length });
+    log("info", "feedback input", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      date,
+      studyTime,
+      tasksCompleted,
+      contentLen: content.length,
+    });
 
-    const planDay = await getPlanDay(userId, date, requestId);
+    const planDay = await getPlanDay(auth.userId, date, requestId);
     const plannedTasks = planDay?.tasks?.length ?? null;
 
     const completionRate =
@@ -122,7 +141,7 @@ export async function POST(req: NextRequest) {
     if (!commentText) {
       log("warn", "empty completion", {
         requestId,
-        userIdHash: hash8(userId),
+        userIdHash: hash8(auth.userId),
         date,
         finishReason: completion.choices?.[0]?.finish_reason,
         model: completion.model,
@@ -133,7 +152,7 @@ export async function POST(req: NextRequest) {
 
     log("info", "feedback success", {
       requestId,
-      userIdHash: hash8(userId),
+      userIdHash: hash8(auth.userId),
       date,
       ms: Date.now() - start,
       chars: commentText.length,
