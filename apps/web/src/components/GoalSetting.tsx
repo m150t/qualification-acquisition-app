@@ -436,13 +436,19 @@ export default function GoalSetting() {
     }));
     window.localStorage.setItem('studyPlan', JSON.stringify(planPayload));
 
+    const apiPlan = plan.map((day) => ({
+      date: day.date,
+      theme: day.theme,
+      tasks: day.topics,
+    }));
+
     const payload = {
       certCode: selectedCertCode,
       certName: effectiveCertName,
       examDate,
       weeklyHours: numericWeeklyHours,
       weeksUntilExam: displayWeeks, // 表示に使っている週数を保存
-      plan,
+      plan: apiPlan,
     };
 
     try {
