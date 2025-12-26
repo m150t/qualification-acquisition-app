@@ -13,6 +13,8 @@ const MAX_PLAN_DAYS = 366;
 const MAX_TASKS_PER_DAY = 20;
 const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
+const MAX_EXAM_GUIDE_CHARS = 1500;
+const OPENAI_MAX_TOKENS = 1200;
 
 type GeneratePlanRequest = {
   goal: {
@@ -50,7 +52,9 @@ function isAbortError(error: unknown): boolean {
 function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (!guide) return null;
   if (typeof guide === "string") {
-    return guide.trim() || null;
+    const trimmed = guide.trim();
+    if (!trimmed) return null;
+    return trimmed.slice(0, MAX_EXAM_GUIDE_CHARS);
   }
   const lines: string[] = [];
   if (guide.summary) lines.push(`概要: ${guide.summary}`);
@@ -59,8 +63,9 @@ function formatExamGuide(guide: ExamGuide | undefined): string | null {
   }
   if (guide.notes) lines.push(`備考: ${guide.notes}`);
   if (guide.sourceUrl) lines.push(`参照URL: ${guide.sourceUrl}`);
-  const formatted = lines.join("\n");
-  return formatted.trim() || null;
+  const formatted = lines.join("\n").trim();
+  if (!formatted) return null;
+  return formatted.slice(0, MAX_EXAM_GUIDE_CHARS);
 }
 
 function sanitizePlan(input: unknown): PlanDay[] {
@@ -157,7 +162,8 @@ export async function POST(req: NextRequest) {
 ${examGuideSection}
 
 上記をもとに、試験日までの学習計画を立ててください。
-レスポンスは必ず JSON 配列のみで返してください。各要素は以下の形式：
+レスポンスは必ず JSON 配列のみで返してください。
+各要素は以下の形式で、タスクは最大3件までにしてください：
 {
   "date": "YYYY-MM-DD",
   "theme": "その日の学習テーマ",
@@ -186,6 +192,7 @@ ${examGuideSection}
             },
             { role: "user", content: prompt },
           ],
+          max_tokens: OPENAI_MAX_TOKENS,
         },
       );
       console.log("plan api openai completed", {
