@@ -14,8 +14,6 @@ const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const MODEL = "gpt-4.1-mini";
 const MAX_CONTENT_LENGTH = 4000;
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
 function safeNumber(v: any): number | null {
   const n = typeof v === "string" ? Number(v) : v;
   return Number.isFinite(n) ? n : null;
@@ -69,6 +67,8 @@ export async function POST(req: NextRequest) {
       log("error", "OPENAI_API_KEY missing", { requestId, userIdHash: hash8(auth.userId) });
       return NextResponse.json({ error: "Server misconfigured", requestId }, { status: 500 });
     }
+
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const body = await req.json();
     const content = String(body.content ?? "").trim();
