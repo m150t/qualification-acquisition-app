@@ -404,12 +404,12 @@ export default function GoalSetting() {
       return;
     }
 
-    if (
-      existingGoal &&
-      !window.confirm(
+    const shouldOverwrite =
+      !existingGoal ||
+      window.confirm(
         'すでに目標が設定されています。新しい内容で上書きしてもよろしいですか？',
-      )
-    ) {
+      );
+    if (!shouldOverwrite) {
       return;
     }
 
@@ -449,6 +449,7 @@ export default function GoalSetting() {
       weeklyHours: numericWeeklyHours,
       weeksUntilExam: displayWeeks, // 表示に使っている週数を保存
       plan: apiPlan,
+      resetReports: Boolean(existingGoal),
     };
 
     try {
