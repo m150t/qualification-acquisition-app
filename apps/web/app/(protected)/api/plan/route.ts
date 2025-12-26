@@ -74,7 +74,11 @@ function sanitizePlan(input: unknown): PlanDay[] {
   return input.slice(0, MAX_PLAN_DAYS).map((day) => {
     const date = typeof day?.date === "string" ? day.date.trim().slice(0, MAX_EXAM_DATE_LENGTH) : "";
     const theme = typeof day?.theme === "string" ? day.theme.trim().slice(0, MAX_THEME_LENGTH) : undefined;
-    const rawTasks = Array.isArray(day?.tasks) ? day.tasks : [];
+  const rawTasks = Array.isArray(day?.tasks)
+    ? day.tasks
+    : Array.isArray(day?.topics)
+      ? day.topics
+      : [];
     const tasks = rawTasks
       .filter((task: unknown) => typeof task === "string")
       .slice(0, MAX_TASKS_PER_DAY)
