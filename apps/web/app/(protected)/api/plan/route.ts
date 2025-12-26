@@ -83,10 +83,18 @@ function sanitizePlan(input: unknown): PlanDay[] {
   });
 }
 
+function extractPlanPayload(payload: unknown): PlanDay[] {
+  if (Array.isArray(payload)) return sanitizePlan(payload);
+  if (payload && typeof payload === "object" && "plan" in payload) {
+    return sanitizePlan((payload as { plan?: unknown }).plan);
+  }
+  return [];
+}
+
 function parsePlanFromText(text: string, requestId: string): PlanDay[] {
   if (!text) return [];
   try {
-    return sanitizePlan(JSON.parse(text));
+    return extractPlanPayload(JSON.parse(text));
   } catch (error) {
     const start = text.indexOf("[");
     const end = text.lastIndexOf("]");
@@ -94,7 +102,7 @@ function parsePlanFromText(text: string, requestId: string): PlanDay[] {
       const slice = text.slice(start, end + 1);
       try {
         console.warn("plan api json fallback parse", { requestId });
-        return sanitizePlan(JSON.parse(slice));
+        return extractPlanPayload(JSON.parse(slice));
       } catch (innerError) {
         console.error("plan api json fallback failed", innerError);
       }
@@ -183,7 +191,8 @@ export async function POST(req: NextRequest) {
 ${examGuideSection}
 
 上記をもとに、試験日までの学習計画を立ててください。
-レスポンスは必ず JSON 配列のみで返してください。
+レスポンスは必ず JSON オブジェクトで返してください。
+フォーマットは { "plan": [ ... ] } のみです。
 各要素は以下の形式で、タスクは最大3件までにしてください：
 {
   "date": "YYYY-MM-DD",
@@ -218,18 +227,25 @@ ${examGuideSection}
             json_schema: {
               name: "study_plan",
               schema: {
-                type: "array",
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["date", "theme", "tasks"],
-                  properties: {
-                    date: { type: "string" },
-                    theme: { type: "string" },
-                    tasks: {
-                      type: "array",
-                      items: { type: "string" },
-                      maxItems: 3,
+                type: "object",
+                additionalProperties: false,
+                required: ["plan"],
+                properties: {
+                  plan: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["date", "theme", "tasks"],
+                      properties: {
+                        date: { type: "string" },
+                        theme: { type: "string" },
+                        tasks: {
+                          type: "array",
+                          items: { type: "string" },
+                          maxItems: 3,
+                        },
+                      },
                     },
                   },
                 },
