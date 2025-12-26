@@ -16,17 +16,23 @@ const CUSTOM_CERTIFICATIONS_TABLE =
   process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || "CustomCertifications";
 
 async function deleteReports(userId: string) {
-  const res = await ddb.send(
-    new QueryCommand({
-      TableName: REPORTS_TABLE,
-      KeyConditionExpression: "userId = :uid",
-      ExpressionAttributeValues: { ":uid": userId },
-      ProjectionExpression: "userId, #d",
-      ExpressionAttributeNames: { "#d": "date" },
-    }),
-  );
+  const items: Array<{ userId: string; date: string }> = [];
+  let lastEvaluatedKey: Record<string, unknown> | undefined;
+  do {
+    const res = await ddb.send(
+      new QueryCommand({
+        TableName: REPORTS_TABLE,
+        KeyConditionExpression: "userId = :uid",
+        ExpressionAttributeValues: { ":uid": userId },
+        ProjectionExpression: "userId, #d",
+        ExpressionAttributeNames: { "#d": "date" },
+        ExclusiveStartKey: lastEvaluatedKey,
+      }),
+    );
+    items.push(...((res.Items as Array<{ userId: string; date: string }>) ?? []));
+    lastEvaluatedKey = res.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
 
-  const items = res.Items ?? [];
   if (!items.length) return;
 
   const batches: typeof items[] = [];
@@ -48,15 +54,22 @@ async function deleteReports(userId: string) {
 }
 
 async function deleteCustomCertifications(userId: string) {
-  const res = await ddb.send(
-    new ScanCommand({
-      TableName: CUSTOM_CERTIFICATIONS_TABLE,
-      FilterExpression: "userId = :uid",
-      ExpressionAttributeValues: { ":uid": userId },
-    }),
-  );
+  const items: Array<{ id: string }> = [];
+  let lastEvaluatedKey: Record<string, unknown> | undefined;
+  do {
+    const res = await ddb.send(
+      new ScanCommand({
+        TableName: CUSTOM_CERTIFICATIONS_TABLE,
+        FilterExpression: "userId = :uid",
+        ExpressionAttributeValues: { ":uid": userId },
+        ProjectionExpression: "id",
+        ExclusiveStartKey: lastEvaluatedKey,
+      }),
+    );
+    items.push(...((res.Items as Array<{ id: string }>) ?? []));
+    lastEvaluatedKey = res.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
 
-  const items = res.Items ?? [];
   if (!items.length) return;
 
   const batches: typeof items[] = [];
