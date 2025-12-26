@@ -206,10 +206,19 @@ export default function GoalSetting() {
   const [isLoadingGoal, setIsLoadingGoal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
-  const availableCertifications = useMemo(
-    () => (certifications.length > 0 ? certifications : FALLBACK_CERTIFICATIONS),
-    [certifications],
-  );
+  const availableCertifications = useMemo<Certification[]>(() => {
+    const baseList =
+      certifications.length > 0 ? certifications : FALLBACK_CERTIFICATIONS;
+    if (baseList.some((cert) => cert.code === 'other')) {
+      return baseList;
+    }
+    const otherOption: Certification = {
+      code: 'other',
+      name: 'その他（自由入力）',
+      provider: 'other',
+    };
+    return [...baseList, otherOption];
+  }, [certifications]);
 
   // 選択中資格
   const selectedCert =
@@ -247,6 +256,10 @@ export default function GoalSetting() {
   useEffect(() => {
     // 資格マスタに defaultWeeklyHours があるなら設定（初期のみ）
     const cert = availableCertifications.find((c) => c.code === selectedCertCode);
+    if (selectedCertCode === 'other' && weeklyHours === '') {
+      setWeeklyHours('0');
+      return;
+    }
     if (cert?.defaultWeeklyHours && weeklyHours === '') {
       setWeeklyHours(String(cert.defaultWeeklyHours));
     }
@@ -330,8 +343,11 @@ export default function GoalSetting() {
       return;
     }
 
+    const parsedWeeklyHours = weeklyHours === '' ? null : Number(weeklyHours);
     const numericWeeklyHours =
-      weeklyHours === '' ? null : Number(weeklyHours) || null;
+      parsedWeeklyHours === null || Number.isNaN(parsedWeeklyHours)
+        ? null
+        : parsedWeeklyHours;
 
     setIsGeneratingPlan(true);
 
@@ -404,8 +420,11 @@ export default function GoalSetting() {
       return;
     }
 
+    const parsedWeeklyHours = weeklyHours === '' ? null : Number(weeklyHours);
     const numericWeeklyHours =
-      weeklyHours === '' ? null : Number(weeklyHours) || null;
+      parsedWeeklyHours === null || Number.isNaN(parsedWeeklyHours)
+        ? null
+        : parsedWeeklyHours;
 
     // 1. Goal（試験情報）を localStorage に保存
     const goalPayload: StudyGoal = {
@@ -562,16 +581,18 @@ export default function GoalSetting() {
               <select
                 className="w-full rounded-lg border border-gray-300 p-3"
                 value={selectedCertCode}
-                onChange={(e) => {
-                  const code = e.target.value;
-                  setSelectedCertCode(code);
-                  const cert = availableCertifications.find((c) => c.code === code);
-                  if (cert?.defaultWeeklyHours) {
-                    setWeeklyHours(String(cert.defaultWeeklyHours));
-                  } else {
-                    setWeeklyHours('');
-                  }
-                }}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    setSelectedCertCode(code);
+                    const cert = availableCertifications.find((c) => c.code === code);
+                    if (code === 'other') {
+                      setWeeklyHours('0');
+                    } else if (cert?.defaultWeeklyHours) {
+                      setWeeklyHours(String(cert.defaultWeeklyHours));
+                    } else {
+                      setWeeklyHours('');
+                    }
+                  }}
               >
                 {isLoadingCertifications && (
                   <option value="" disabled>
@@ -656,7 +677,7 @@ export default function GoalSetting() {
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm text-gray-600">推奨学習時間</span>
                   <span className="text-sm text-gray-900">
-                    {weeklyHours ? `${weeklyHours}時間` : '—'}
+                    {weeklyHours !== '' ? `${weeklyHours}時間` : '—'}
                   </span>
                 </div>
               </div>
