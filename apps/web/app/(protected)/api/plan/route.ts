@@ -73,6 +73,15 @@ function sanitizePlan(input: unknown): PlanDay[] {
   });
 }
 
+function isAbortError(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === "object" && "name" in error) {
+    return String(error.name).toLowerCase() === "aborterror";
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes("aborted");
+}
+
 async function fetchExamGuide(certCode?: string): Promise<string | null> {
   if (!certCode) return null;
   try {
@@ -167,8 +176,7 @@ ${examGuideSection}
         { signal: ac.signal },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (ac.signal.aborted || message.toLowerCase().includes("aborted")) {
+      if (ac.signal.aborted || isAbortError(error)) {
         return NextResponse.json({
           plan: [],
           warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
@@ -197,6 +205,12 @@ ${examGuideSection}
 
     return NextResponse.json({ plan });
   } catch (e: unknown) {
+    if (isAbortError(e)) {
+      return NextResponse.json({
+        plan: [],
+        warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
+      });
+    }
     console.error("plan api error", e);
     return NextResponse.json(
       {
