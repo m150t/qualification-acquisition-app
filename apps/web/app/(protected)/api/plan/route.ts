@@ -13,6 +13,8 @@ const MAX_PLAN_DAYS = 366;
 const MAX_TASKS_PER_DAY = 20;
 const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
+const MAX_EXAM_GUIDE_CHARS = 1500;
+const OPENAI_MAX_TOKENS = 1200;
 
 type GeneratePlanRequest = {
   goal: {
@@ -38,10 +40,21 @@ type PlanDay = {
   tasks?: string[];
 };
 
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: string }).name === "AbortError"
+  );
+}
+
 function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (!guide) return null;
   if (typeof guide === "string") {
-    return guide.trim() || null;
+    const trimmed = guide.trim();
+    if (!trimmed) return null;
+    return trimmed.slice(0, MAX_EXAM_GUIDE_CHARS);
   }
   const lines: string[] = [];
   if (guide.summary) lines.push(`概要: ${guide.summary}`);
@@ -50,8 +63,9 @@ function formatExamGuide(guide: ExamGuide | undefined): string | null {
   }
   if (guide.notes) lines.push(`備考: ${guide.notes}`);
   if (guide.sourceUrl) lines.push(`参照URL: ${guide.sourceUrl}`);
-  const formatted = lines.join("\n");
-  return formatted.trim() || null;
+  const formatted = lines.join("\n").trim();
+  if (!formatted) return null;
+  return formatted.slice(0, MAX_EXAM_GUIDE_CHARS);
 }
 
 function sanitizePlan(input: unknown): PlanDay[] {
@@ -67,6 +81,35 @@ function sanitizePlan(input: unknown): PlanDay[] {
       .filter((task: string) => task.length > 0);
     return { date, theme, tasks };
   });
+}
+
+function extractPlanPayload(payload: unknown): PlanDay[] {
+  if (Array.isArray(payload)) return sanitizePlan(payload);
+  if (payload && typeof payload === "object" && "plan" in payload) {
+    return sanitizePlan((payload as { plan?: unknown }).plan);
+  }
+  return [];
+}
+
+function parsePlanFromText(text: string, requestId: string): PlanDay[] {
+  if (!text) return [];
+  try {
+    return extractPlanPayload(JSON.parse(text));
+  } catch (error) {
+    const start = text.indexOf("[");
+    const end = text.lastIndexOf("]");
+    if (start >= 0 && end > start) {
+      const slice = text.slice(start, end + 1);
+      try {
+        console.warn("plan api json fallback parse", { requestId });
+        return extractPlanPayload(JSON.parse(slice));
+      } catch (innerError) {
+        console.error("plan api json fallback failed", innerError);
+      }
+    }
+    console.error("failed to parse plan JSON", error);
+    return [];
+  }
 }
 
 async function fetchExamGuide(certCode?: string): Promise<string | null> {
@@ -87,7 +130,11 @@ async function fetchExamGuide(certCode?: string): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const requestId =
+    req.headers.get("x-request-id") ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const requestStartedAt = Date.now();
   try {
+    console.log("plan api start", { requestId });
     const auth = await requireAuth(req);
     if (!auth) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -126,7 +173,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const examGuideStartedAt = Date.now();
     const examGuide = await fetchExamGuide(goal.certCode);
+    console.log("plan api exam guide fetched", {
+      requestId,
+      elapsedMs: Date.now() - examGuideStartedAt,
+      hasExamGuide: Boolean(examGuide),
+    });
     const examGuideSection = examGuide
       ? `\n試験ガイド情報:\n${examGuide}\n`
       : "\n試験ガイド情報: 未登録\n";
@@ -138,7 +191,9 @@ export async function POST(req: NextRequest) {
 ${examGuideSection}
 
 上記をもとに、試験日までの学習計画を立ててください。
-レスポンスは必ず JSON 配列のみで返してください。各要素は以下の形式：
+レスポンスは必ず JSON オブジェクトで返してください。
+フォーマットは { "plan": [ ... ] } のみです。
+各要素は以下の形式で、タスクは最大3件までにしてください：
 {
   "date": "YYYY-MM-DD",
   "theme": "その日の学習テーマ",
@@ -146,11 +201,16 @@ ${examGuideSection}
 }
 `;
 
+    const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "8000");
+    const timeoutMs = Number.isFinite(rawTimeoutMs)
+      ? Math.min(Math.max(rawTimeoutMs, 1000), 60000)
+      : 8000;
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 15_000);
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
 
     let completion;
     try {
+      const openAiStartedAt = Date.now();
       completion = await client.chat.completions.create(
         {
           model: "gpt-4.1-mini",
@@ -162,11 +222,52 @@ ${examGuideSection}
             },
             { role: "user", content: prompt },
           ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "study_plan",
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                required: ["plan"],
+                properties: {
+                  plan: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["date", "theme", "tasks"],
+                      properties: {
+                        date: { type: "string" },
+                        theme: { type: "string" },
+                        tasks: {
+                          type: "array",
+                          items: { type: "string" },
+                          maxItems: 3,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              strict: true,
+            },
+          },
+          max_tokens: OPENAI_MAX_TOKENS,
         },
         { signal: ac.signal },
       );
+      console.log("plan api openai completed", {
+        requestId,
+        elapsedMs: Date.now() - openAiStartedAt,
+      });
     } catch (error) {
       if (ac.signal.aborted || isAbortError(error)) {
+        console.warn("plan api openai timeout", {
+          requestId,
+          elapsedMs: Date.now() - requestStartedAt,
+          timeoutMs,
+        });
         return NextResponse.json({
           plan: [],
           warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
@@ -180,22 +281,20 @@ ${examGuideSection}
     const msg = completion.choices[0]?.message;
     const text = (msg?.content ?? "").toString().trim();
 
-    let plan: PlanDay[] = [];
+    const plan = parsePlanFromText(text, requestId);
 
-    try {
-      if (text) {
-        const parsed = JSON.parse(text);
-        plan = sanitizePlan(parsed);
-      }
-    } catch (e) {
-      console.error("failed to parse plan JSON", e);
-      // パース失敗時は空配列で返す
-      plan = [];
-    }
-
+    console.log("plan api success", {
+      requestId,
+      elapsedMs: Date.now() - requestStartedAt,
+      planDays: plan.length,
+    });
     return NextResponse.json({ plan });
   } catch (e: unknown) {
     if (isAbortError(e)) {
+      console.warn("plan api aborted", {
+        requestId,
+        elapsedMs: Date.now() - requestStartedAt,
+      });
       return NextResponse.json({
         plan: [],
         warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
