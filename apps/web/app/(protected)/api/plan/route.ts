@@ -5,14 +5,14 @@ import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 const MAX_CERT_NAME_LENGTH = 200;
 const MAX_EXAM_DATE_LENGTH = 20;
+const MAX_PLAN_DAYS = 366;
+const MAX_TASKS_PER_DAY = 20;
+const MAX_TASK_LENGTH = 200;
+const MAX_THEME_LENGTH = 200;
 
 type GeneratePlanRequest = {
   goal: {
@@ -32,6 +32,12 @@ type ExamGuide =
       notes?: string;
     };
 
+type PlanDay = {
+  date: string;
+  theme?: string;
+  tasks?: string[];
+};
+
 function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (!guide) return null;
   if (typeof guide === "string") {
@@ -46,6 +52,52 @@ function formatExamGuide(guide: ExamGuide | undefined): string | null {
   if (guide.sourceUrl) lines.push(`参照URL: ${guide.sourceUrl}`);
   const formatted = lines.join("\n");
   return formatted.trim() || null;
+}
+
+function sanitizePlan(input: unknown): PlanDay[] {
+  if (!Array.isArray(input)) return [];
+  return input.slice(0, MAX_PLAN_DAYS).map((day) => {
+    const date = typeof day?.date === "string" ? day.date.trim().slice(0, MAX_EXAM_DATE_LENGTH) : "";
+    const theme = typeof day?.theme === "string" ? day.theme.trim().slice(0, MAX_THEME_LENGTH) : undefined;
+    const rawTasks = Array.isArray(day?.tasks) ? day.tasks : [];
+    const tasks = rawTasks
+      .filter((task: unknown) => typeof task === "string")
+      .slice(0, MAX_TASKS_PER_DAY)
+      .map((task: string) => task.trim().slice(0, MAX_TASK_LENGTH))
+      .filter((task: string) => task.length > 0);
+    return { date, theme, tasks };
+  });
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error) return false;
+  const candidates: string[] = [];
+  if (typeof error === "object") {
+    if ("name" in error && error.name) {
+      candidates.push(String(error.name));
+    }
+    if ("message" in error && error.message) {
+      candidates.push(String(error.message));
+    }
+    if ("cause" in error && error.cause) {
+      candidates.push(String(error.cause));
+    }
+    if ("error" in error && error.error) {
+      candidates.push(String(error.error));
+    }
+  }
+  if (error instanceof Error) {
+    candidates.push(error.message);
+  } else {
+    candidates.push(String(error));
+  }
+  try {
+    candidates.push(JSON.stringify(error));
+  } catch {
+    // ignore stringify errors
+  }
+
+  return candidates.some((value) => value.toLowerCase().includes("abort"));
 }
 
 async function fetchExamGuide(certCode?: string): Promise<string | null> {
@@ -71,6 +123,16 @@ export async function POST(req: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "Server misconfigured" },
+        { status: 500 },
+      );
+    }
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
     const ip = getClientIp(req.headers);
     const limiter = rateLimit(`plan:${auth.userId}:${ip}`, { limit: 5, windowMs: 60_000 });
@@ -115,29 +177,46 @@ ${examGuideSection}
 }
 `;
 
-    const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 15_000);
+
+    let completion;
+    try {
+      completion = await client.chat.completions.create(
         {
-          role: "system",
-          content:
-            "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。",
+          model: "gpt-4.1-mini",
+          messages: [
+            {
+              role: "system",
+              content:
+                "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を JSON で返してください。",
+            },
+            { role: "user", content: prompt },
+          ],
         },
-        { role: "user", content: prompt },
-      ],
-    });
+        { signal: ac.signal },
+      );
+    } catch (error) {
+      if (ac.signal.aborted || isAbortError(error)) {
+        return NextResponse.json({
+          plan: [],
+          warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
 
     const msg = completion.choices[0]?.message;
     const text = (msg?.content ?? "").toString().trim();
 
-    let plan: Array<Record<string, unknown>> = [];
+    let plan: PlanDay[] = [];
 
     try {
       if (text) {
         const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) {
-          plan = parsed as Array<Record<string, unknown>>;
-        }
+        plan = sanitizePlan(parsed);
       }
     } catch (e) {
       console.error("failed to parse plan JSON", e);
@@ -147,11 +226,16 @@ ${examGuideSection}
 
     return NextResponse.json({ plan });
   } catch (e: unknown) {
+    if (isAbortError(e)) {
+      return NextResponse.json({
+        plan: [],
+        warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
+      });
+    }
     console.error("plan api error", e);
     return NextResponse.json(
       {
         error: "学習計画の生成に失敗しました",
-        detail: e instanceof Error ? e.message : String(e),
       },
       { status: 500 },
     );
