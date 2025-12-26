@@ -169,9 +169,10 @@ export async function DELETE(req: NextRequest) {
     }
 
     for (const batch of batches) {
-      let unprocessed = batch.map((it) => ({
-        DeleteRequest: { Key: { userId: it.userId, date: it.date } },
-      }));
+      let unprocessed: Array<{ DeleteRequest: { Key: { userId: string; date: string } } }> =
+        batch.map((it) => ({
+          DeleteRequest: { Key: { userId: it.userId, date: it.date } },
+        }));
 
       let attempts = 0;
       while (unprocessed.length > 0 && attempts < 5) {
@@ -182,7 +183,10 @@ export async function DELETE(req: NextRequest) {
             },
           }),
         );
-        unprocessed = res.UnprocessedItems?.[REPORTS_TABLE] ?? [];
+        unprocessed =
+          (res.UnprocessedItems?.[REPORTS_TABLE] as
+            | Array<{ DeleteRequest: { Key: { userId: string; date: string } } }>
+            | undefined) ?? [];
         attempts += 1;
       }
     }
