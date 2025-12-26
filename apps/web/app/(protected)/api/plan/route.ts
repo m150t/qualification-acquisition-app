@@ -71,11 +71,33 @@ function sanitizePlan(input: unknown): PlanDay[] {
 
 function isAbortError(error: unknown): boolean {
   if (!error) return false;
-  if (typeof error === "object" && "name" in error) {
-    return String(error.name).toLowerCase() === "aborterror";
+  const candidates: string[] = [];
+  if (typeof error === "object") {
+    if ("name" in error && error.name) {
+      candidates.push(String(error.name));
+    }
+    if ("message" in error && error.message) {
+      candidates.push(String(error.message));
+    }
+    if ("cause" in error && error.cause) {
+      candidates.push(String(error.cause));
+    }
+    if ("error" in error && error.error) {
+      candidates.push(String(error.error));
+    }
   }
-  const message = error instanceof Error ? error.message : String(error);
-  return message.toLowerCase().includes("aborted");
+  if (error instanceof Error) {
+    candidates.push(error.message);
+  } else {
+    candidates.push(String(error));
+  }
+  try {
+    candidates.push(JSON.stringify(error));
+  } catch {
+    // ignore stringify errors
+  }
+
+  return candidates.some((value) => value.toLowerCase().includes("abort"));
 }
 
 async function fetchExamGuide(certCode?: string): Promise<string | null> {
