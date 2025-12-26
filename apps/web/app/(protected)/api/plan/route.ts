@@ -146,9 +146,6 @@ ${examGuideSection}
 }
 `;
 
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 15_000);
-
     let completion;
     try {
       completion = await client.chat.completions.create(
@@ -163,18 +160,9 @@ ${examGuideSection}
             { role: "user", content: prompt },
           ],
         },
-        { signal: ac.signal },
       );
     } catch (error) {
-      if (ac.signal.aborted || isAbortError(error)) {
-        return NextResponse.json({
-          plan: [],
-          warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
-        });
-      }
       throw error;
-    } finally {
-      clearTimeout(timer);
     }
 
     const msg = completion.choices[0]?.message;
@@ -195,12 +183,6 @@ ${examGuideSection}
 
     return NextResponse.json({ plan });
   } catch (e: unknown) {
-    if (isAbortError(e)) {
-      return NextResponse.json({
-        plan: [],
-        warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
-      });
-    }
     console.error("plan api error", e);
     return NextResponse.json(
       {
