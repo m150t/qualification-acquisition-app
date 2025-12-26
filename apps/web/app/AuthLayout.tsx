@@ -56,7 +56,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               throw new Error(message || "failed to delete account data");
             }
             await deleteUser();
-            await signOut();
+            await signOut?.();
           } catch (error) {
             console.error("failed to delete account", error);
             alert("退会処理に失敗しました。時間をおいて再度お試しください。");
