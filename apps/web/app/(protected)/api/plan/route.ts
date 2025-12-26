@@ -83,6 +83,27 @@ function sanitizePlan(input: unknown): PlanDay[] {
   });
 }
 
+function parsePlanFromText(text: string, requestId: string): PlanDay[] {
+  if (!text) return [];
+  try {
+    return sanitizePlan(JSON.parse(text));
+  } catch (error) {
+    const start = text.indexOf("[");
+    const end = text.lastIndexOf("]");
+    if (start >= 0 && end > start) {
+      const slice = text.slice(start, end + 1);
+      try {
+        console.warn("plan api json fallback parse", { requestId });
+        return sanitizePlan(JSON.parse(slice));
+      } catch (innerError) {
+        console.error("plan api json fallback failed", innerError);
+      }
+    }
+    console.error("failed to parse plan JSON", error);
+    return [];
+  }
+}
+
 async function fetchExamGuide(certCode?: string): Promise<string | null> {
   if (!certCode) return null;
   try {
@@ -217,18 +238,7 @@ ${examGuideSection}
     const msg = completion.choices[0]?.message;
     const text = (msg?.content ?? "").toString().trim();
 
-    let plan: PlanDay[] = [];
-
-    try {
-      if (text) {
-        const parsed = JSON.parse(text);
-        plan = sanitizePlan(parsed);
-      }
-    } catch (e) {
-      console.error("failed to parse plan JSON", e);
-      // パース失敗時は空配列で返す
-      plan = [];
-    }
+    const plan = parsePlanFromText(text, requestId);
 
     console.log("plan api success", {
       requestId,
