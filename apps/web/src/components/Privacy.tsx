@@ -89,7 +89,7 @@ export default function Privacy() {
           </Section>
 
           <div style={{ marginTop: 28, fontSize: 12, color: "#666" }}>
-            最終更新日：2025-12-26（例。実際の日付に直して）
+            最終更新日：2025-12-26
           </div>
         </div>
       </div>
@@ -105,3 +105,4 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </section>
   );
 }
+
