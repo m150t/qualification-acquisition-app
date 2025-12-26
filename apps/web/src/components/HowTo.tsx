@@ -1,4 +1,3 @@
-// src/components/HowTo.tsx
 import Link from "next/link";
 
 const CONTACT_URL = "https://forms.gle/GwcLWTGeKGwLwdkC9";
@@ -7,23 +6,7 @@ export default function HowTo() {
   return (
     <main style={{ minHeight: "100vh", padding: "64px 24px" }}>
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <Link href="/" style={{ textDecoration: "none", color: "#111", fontWeight: 800 }}>
-            QUALog
-          </Link>
-
-          <nav style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 14 }}>
-            <Link href="/terms" style={{ color: "#111", textDecoration: "underline" }}>
-              利用規約
-            </Link>
-            <Link href="/privacy" style={{ color: "#111", textDecoration: "underline" }}>
-              プライバシーポリシー
-            </Link>
-            <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>
-              お問い合わせ
-            </a>
-          </nav>
-        </header>
+        <Header />
 
         <h1 style={{ marginTop: 28, fontSize: 34, fontWeight: 900, letterSpacing: "-0.02em" }}>
           使い方（3分でわかる）
@@ -74,12 +57,11 @@ export default function HowTo() {
             step="STEP 1"
             title="試験を選んで、学習の枠を決める"
             bullets={[
-              "対象資格（例：AWS CLF-C02）と期限を決めます。",
+              "対象資格と期限を決めます。",
               "週に確保できる学習時間の目安を入れます。",
               "ここが曖昧だと計画が全部ブレるので、最初に固定してください。",
             ]}
           />
-
           <Card
             step="STEP 2"
             title="学習計画を作る（= 迷いを消す）"
@@ -89,7 +71,6 @@ export default function HowTo() {
               "計画は完璧じゃなくてOK。回しながら直す前提です。",
             ]}
           />
-
           <Card
             step="STEP 3"
             title="日報を書く（= 継続の仕組み）"
@@ -131,22 +112,66 @@ export default function HowTo() {
           />
         </section>
 
-        <footer style={{ marginTop: 56, paddingTop: 16, borderTop: "1px solid #eee", fontSize: 12, color: "#666" }}>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span>※ 現在ベータ版として公開中です。</span>
-            <Link href="/terms" style={{ color: "#666", textDecoration: "underline" }}>
-              利用規約
-            </Link>
-            <Link href="/privacy" style={{ color: "#666", textDecoration: "underline" }}>
-              プライバシーポリシー
-            </Link>
-            <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer" style={{ color: "#666", textDecoration: "underline" }}>
-              お問い合わせ
-            </a>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </main>
+  );
+}
+
+function Header() {
+  return (
+    <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+      <Link href="/" style={{ textDecoration: "none", color: "#111", fontWeight: 800 }}>
+        QUALog
+      </Link>
+
+      <nav style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 14 }}>
+        <Link href="/howto" style={{ color: "#111", textDecoration: "underline" }}>
+          使い方
+        </Link>
+        <Link href="/terms" style={{ color: "#111", textDecoration: "underline" }}>
+          利用規約
+        </Link>
+        <Link href="/privacy" style={{ color: "#111", textDecoration: "underline" }}>
+          プライバシーポリシー
+        </Link>
+        <a
+          href={CONTACT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#111", textDecoration: "underline" }}
+        >
+          お問い合わせ
+        </a>
+      </nav>
+    </header>
+  );
+}
+
+function Footer() {
+  return (
+    <footer style={{ marginTop: 56, paddingTop: 16, borderTop: "1px solid #eee", fontSize: 12, color: "#666" }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <span>※ 現在ベータ版として公開中です。</span>
+        <Link href="/howto" style={{ color: "#666", textDecoration: "underline" }}>
+          使い方
+        </Link>
+        <Link href="/terms" style={{ color: "#666", textDecoration: "underline" }}>
+          利用規約
+        </Link>
+        <Link href="/privacy" style={{ color: "#666", textDecoration: "underline" }}>
+          プライバシーポリシー
+        </Link>
+        <a
+          href={CONTACT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#666", textDecoration: "underline" }}
+        >
+          お問い合わせ
+        </a>
+      </div>
+    </footer>
   );
 }
 
