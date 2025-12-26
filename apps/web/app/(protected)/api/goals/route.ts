@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DeleteCommand, PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchWriteCommand,
+  DeleteCommand,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { hash8, log } from "@/src/lib/logger";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
+const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
 const CUSTOM_CERTIFICATIONS_TABLE =
   process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || "CustomCertifications";
 
@@ -14,19 +21,67 @@ const MAX_PLAN_DAYS = 366;
 const MAX_TASKS_PER_DAY = 20;
 const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
+const MAX_DATE_LENGTH = 20;
 
 function normalizePlan(plan: unknown) {
   if (!Array.isArray(plan)) return [];
   return plan.slice(0, MAX_PLAN_DAYS).map((day) => {
-    const date = typeof day?.date === "string" ? day.date : "";
-    const theme = typeof day?.theme === "string" ? day.theme.slice(0, MAX_THEME_LENGTH) : undefined;
+    const date =
+      typeof day?.date === "string" ? day.date.trim().slice(0, MAX_DATE_LENGTH) : "";
+    const theme =
+      typeof day?.theme === "string"
+        ? day.theme.trim().slice(0, MAX_THEME_LENGTH)
+        : undefined;
     const rawTasks = Array.isArray(day?.tasks) ? day.tasks : Array.isArray(day?.topics) ? day.topics : [];
     const tasks = rawTasks
       .filter((task: unknown) => typeof task === "string")
       .slice(0, MAX_TASKS_PER_DAY)
-      .map((task: string) => task.slice(0, MAX_TASK_LENGTH));
+      .map((task: string) => task.trim().slice(0, MAX_TASK_LENGTH))
+      .filter((task: string) => task.length > 0);
     return { date, theme, tasks };
   });
+}
+
+async function deleteUserReports(userId: string, requestId: string) {
+  const res = await ddb.send(
+    new QueryCommand({
+      TableName: REPORTS_TABLE,
+      KeyConditionExpression: "userId = :uid",
+      ExpressionAttributeValues: { ":uid": userId },
+      ProjectionExpression: "userId, #d",
+      ExpressionAttributeNames: { "#d": "date" },
+    }),
+  );
+
+  const items = res.Items ?? [];
+  if (!items.length) {
+    log("info", "reports delete empty", { requestId, userIdHash: hash8(userId) });
+    return 0;
+  }
+
+  const batches: typeof items[] = [];
+  for (let i = 0; i < items.length; i += 25) {
+    batches.push(items.slice(i, i + 25));
+  }
+
+  for (const batch of batches) {
+    await ddb.send(
+      new BatchWriteCommand({
+        RequestItems: {
+          [REPORTS_TABLE]: batch.map((it) => ({
+            DeleteRequest: { Key: { userId: it.userId, date: it.date } },
+          })),
+        },
+      }),
+    );
+  }
+
+  log("info", "reports delete success", {
+    requestId,
+    userIdHash: hash8(userId),
+    deleted: items.length,
+  });
+  return items.length;
 }
 
 // POST: 目標＋日付ベースの計画を保存
@@ -146,6 +201,8 @@ export async function DELETE(req: NextRequest) {
         Key: { userId: auth.userId },
       }),
     );
+
+    await deleteUserReports(auth.userId, requestId);
 
     log("info", "goals delete success", { requestId, userIdHash: hash8(auth.userId) });
     return NextResponse.json({ ok: true, requestId });
