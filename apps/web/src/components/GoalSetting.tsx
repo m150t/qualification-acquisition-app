@@ -828,9 +828,6 @@ export default function GoalSetting() {
                         <span className="text-sm text-gray-600">
                           Day {day.dayIndex}
                         </span>
-                        <span className="text-xs text-gray-500">
-                          （{formatJP(day.date)}）
-                        </span>
                       </div>
                       <h3 className="text-gray-900">{day.theme}</h3>
                     </div>
