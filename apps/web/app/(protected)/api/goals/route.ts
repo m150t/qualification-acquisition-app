@@ -22,27 +22,24 @@ const MAX_TASKS_PER_DAY = 20;
 const MAX_TASK_LENGTH = 200;
 const MAX_THEME_LENGTH = 200;
 const MAX_DATE_LENGTH = 20;
-const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function normalizeDateString(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (DATE_ONLY_REGEX.test(trimmed)) return trimmed;
-  const parsed = new Date(trimmed);
-  if (Number.isNaN(parsed.getTime())) {
-    return trimmed.slice(0, MAX_DATE_LENGTH);
-  }
-  parsed.setHours(0, 0, 0, 0);
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
+function toDateOnlyString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function normalizePlan(plan: unknown) {
   if (!Array.isArray(plan)) return [];
-  return plan.slice(0, MAX_PLAN_DAYS).map((day) => {
-    const date = typeof day?.date === "string" ? normalizeDateString(day.date) : "";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return plan.slice(0, MAX_PLAN_DAYS).map((day, index) => {
+    const date = toDateOnlyString(new Date(today.getTime() + index * MS_PER_DAY)).slice(
+      0,
+      MAX_DATE_LENGTH,
+    );
     const theme =
       typeof day?.theme === "string"
         ? day.theme.trim().slice(0, MAX_THEME_LENGTH)
@@ -58,17 +55,26 @@ function normalizePlan(plan: unknown) {
 }
 
 async function deleteUserReports(userId: string, requestId: string) {
-  const res = await ddb.send(
-    new QueryCommand({
-      TableName: REPORTS_TABLE,
-      KeyConditionExpression: "userId = :uid",
-      ExpressionAttributeValues: { ":uid": userId },
-      ProjectionExpression: "userId, #d",
-      ExpressionAttributeNames: { "#d": "date" },
-    }),
-  );
+  const items: Array<{ userId: string; date: string }> = [];
+  let lastKey: Record<string, any> | undefined;
 
-  const items = res.Items ?? [];
+  do {
+    const res = await ddb.send(
+      new QueryCommand({
+        TableName: REPORTS_TABLE,
+        KeyConditionExpression: "userId = :uid",
+        ExpressionAttributeValues: { ":uid": userId },
+        ProjectionExpression: "userId, #d",
+        ExpressionAttributeNames: { "#d": "date" },
+        ExclusiveStartKey: lastKey,
+      }),
+    );
+    if (res.Items) {
+      items.push(...(res.Items as Array<{ userId: string; date: string }>));
+    }
+    lastKey = res.LastEvaluatedKey;
+  } while (lastKey);
+
   if (!items.length) {
     log("info", "reports delete empty", { requestId, userIdHash: hash8(userId) });
     return 0;
@@ -80,15 +86,21 @@ async function deleteUserReports(userId: string, requestId: string) {
   }
 
   for (const batch of batches) {
-    await ddb.send(
-      new BatchWriteCommand({
-        RequestItems: {
-          [REPORTS_TABLE]: batch.map((it) => ({
-            DeleteRequest: { Key: { userId: it.userId, date: it.date } },
-          })),
-        },
-      }),
-    );
+    let unprocessed = batch.map((it) => ({
+      DeleteRequest: { Key: { userId: it.userId, date: it.date } },
+    }));
+    let attempts = 0;
+    while (unprocessed.length > 0 && attempts < 5) {
+      const res = await ddb.send(
+        new BatchWriteCommand({
+          RequestItems: {
+            [REPORTS_TABLE]: unprocessed,
+          },
+        }),
+      );
+      unprocessed = res.UnprocessedItems?.[REPORTS_TABLE] ?? [];
+      attempts += 1;
+    }
   }
 
   log("info", "reports delete success", {

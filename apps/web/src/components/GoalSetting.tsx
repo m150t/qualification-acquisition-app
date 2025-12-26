@@ -96,18 +96,21 @@ type ApiPlanItem = {
 };
 
 function normalizePlanItems(items: ApiPlanItem[]): DayPlan[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   return items
     .map((item, index) => {
-      if (!item.date || !item.theme) return null;
+      if (!item.theme) return null;
       const rawTopics = Array.isArray(item.tasks)
         ? item.tasks
         : Array.isArray(item.topics)
           ? item.topics
           : [];
       const topics = rawTopics.map((t) => String(t)).filter(Boolean);
+      const date = toDateOnlyString(new Date(today.getTime() + index * MS_PER_DAY));
       return {
         dayIndex: index + 1,
-        date: item.date,
+        date,
         theme: item.theme,
         topics: topics.length > 0 ? topics : ['学習内容を追加してください'],
       };
@@ -449,7 +452,6 @@ export default function GoalSetting() {
       weeklyHours: numericWeeklyHours,
       weeksUntilExam: displayWeeks, // 表示に使っている週数を保存
       plan: apiPlan,
-      resetReports: Boolean(existingGoal),
     };
 
     try {
