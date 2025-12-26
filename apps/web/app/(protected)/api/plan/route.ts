@@ -239,7 +239,6 @@ ${examGuideSection}
           },
           max_tokens: OPENAI_MAX_TOKENS,
         },
-        { signal: ac.signal },
       );
       console.log("plan api openai completed", {
         requestId,
@@ -258,8 +257,6 @@ ${examGuideSection}
         });
       }
       throw error;
-    } finally {
-      clearTimeout(timer);
     }
 
     const msg = completion.choices[0]?.message;
