@@ -148,7 +148,7 @@ ${examGuideSection}
 `;
 
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 8000);
+    const timer = setTimeout(() => ac.abort(), 15_000);
 
     let completion;
     try {
@@ -166,6 +166,15 @@ ${examGuideSection}
         },
         { signal: ac.signal },
       );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (ac.signal.aborted || message.toLowerCase().includes("aborted")) {
+        return NextResponse.json({
+          plan: [],
+          warning: "計画の生成がタイムアウトしました。しばらくしてから再試行してください。",
+        });
+      }
+      throw error;
     } finally {
       clearTimeout(timer);
     }
