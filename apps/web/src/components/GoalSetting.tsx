@@ -407,12 +407,12 @@ export default function GoalSetting() {
       return;
     }
 
-    if (
-      existingGoal &&
-      !window.confirm(
+    const shouldOverwrite =
+      !existingGoal ||
+      window.confirm(
         'すでに目標が設定されています。新しい内容で上書きしてもよろしいですか？',
-      )
-    ) {
+      );
+    if (!shouldOverwrite) {
       return;
     }
 
