@@ -14,6 +14,11 @@ export default function LandingPage() {
           「続く仕組み」を最短で作る学習ダッシュボード。
         </p>
 
+        <p style={{ marginTop: 24, fontSize: 14, color: "#555" }}>
+           🔧 最近のアップデート：
+            カレンダー、日報入力画面に「日別タスク表示」を追加しました（2026/1）
+        </p>
+
         <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap" }}>
           <Link
             href="/app"
@@ -65,6 +70,9 @@ export default function LandingPage() {
           }}
         >
           <span>※ 現在ベータ版として公開中です。</span>
+          <Link href="/changelog" style={{ color: "#666", textDecoration: "underline" }}>
+            更新履歴
+          </Link>
         
           <Link href="/howto" style={{ color: "#666", textDecoration: "underline" }}>
             使い方

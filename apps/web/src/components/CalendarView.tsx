@@ -16,26 +16,47 @@ type StudyDayData = {
 };
 
 type Report = {
-  date: string;          // "YYYY-MM-DD"
+  date: string; // "YYYY-MM-DD"
   studyTime: number | null;
   tasksCompleted: number | null;
   content: string;
   savedAt: string;
 };
 
+type PlanDay = {
+  date: string; // "YYYY-MM-DD"
+  theme?: string;
+  tasks: string[];
+};
+
 export default function CalendarView() {
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
+
   const [studyData, setStudyData] = useState<Record<string, StudyDayData>>({});
   const [monthlyStats, setMonthlyStats] = useState({
     daysCompleted: 0,
     totalHours: 0,
     achievementRate: 0,
   });
-  // 🔁 /api/reports から日報を取得して集計
+
+  // 計画（date -> {theme, tasks[]}）
+  const [planByDate, setPlanByDate] = useState<Record<string, PlanDay>>({});
+  // 選択日（週/月共通で詳細表示）
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+
+  const getDateKey = (date: Date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // /api/reports から日報を取得して集計
   useEffect(() => {
     const fetchReports = async () => {
       let authHeaders: Record<string, string>;
+
       try {
         authHeaders = await getAuthHeaders();
       } catch (error) {
@@ -46,9 +67,7 @@ export default function CalendarView() {
       }
 
       try {
-        const res = await fetch('/api/reports', {
-          headers: authHeaders,
-        });
+        const res = await fetch('/api/reports', { headers: authHeaders });
         if (!res.ok) {
           console.error('failed to load /api/reports', await res.text());
           setStudyData({});
@@ -58,7 +77,6 @@ export default function CalendarView() {
 
         const data = await res.json();
         const reports: Report[] = Array.isArray(data.reports) ? data.reports : [];
-
         const map: Record<string, StudyDayData> = {};
 
         for (const r of reports) {
@@ -68,7 +86,7 @@ export default function CalendarView() {
 
           if (!map[key]) {
             map[key] = {
-              planned: false, // いまは計画との連携は後回し
+              planned: false, // planとの連携は別で表示するのでここはfalseのままでOK
               completed: hours > 0,
               hours,
             };
@@ -80,32 +98,25 @@ export default function CalendarView() {
 
         setStudyData(map);
 
-        // 今月の統計をざっくり計算
+        // 今月の統計
         const now = currentDate;
         const year = now.getFullYear();
-        const month = now.getMonth(); // 0-based
+        const month = now.getMonth();
 
         let daysCompleted = 0;
         let totalHours = 0;
 
-        Object.entries(map).forEach(([dateStr, data]) => {
+        Object.entries(map).forEach(([dateStr, dData]) => {
           const d = new Date(dateStr);
-          if (
-            d.getFullYear() === year &&
-            d.getMonth() === month &&
-            data.completed
-          ) {
+          if (d.getFullYear() === year && d.getMonth() === month && dData.completed) {
             daysCompleted += 1;
-            totalHours += data.hours || 0;
+            totalHours += dData.hours || 0;
           }
         });
 
-        // 仮の「達成率」：今月の日報入力した日の割合（最大 100%）
         const lastDay = new Date(year, month + 1, 0).getDate();
         const achievementRate =
-          lastDay > 0
-            ? Math.min(100, Math.round((daysCompleted / lastDay) * 100))
-            : 0;
+          lastDay > 0 ? Math.min(100, Math.round((daysCompleted / lastDay) * 100)) : 0;
 
         setMonthlyStats({
           daysCompleted,
@@ -121,6 +132,52 @@ export default function CalendarView() {
 
     fetchReports();
   }, [currentDate]);
+
+  // /api/goals から計画(plan)を取得して date -> tasks にする
+  useEffect(() => {
+    const fetchGoals = async () => {
+      let authHeaders: Record<string, string>;
+
+      try {
+        authHeaders = await getAuthHeaders();
+      } catch (error) {
+        console.error('failed to load auth headers(goals)', error);
+        setPlanByDate({});
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/goals', { headers: authHeaders });
+        if (!res.ok) {
+          console.error('failed to load /api/goals', await res.text());
+          setPlanByDate({});
+          return;
+        }
+
+        const data = await res.json();
+        const plan: PlanDay[] = Array.isArray(data.plan) ? data.plan : [];
+
+        const map: Record<string, PlanDay> = {};
+        for (const d of plan) {
+          if (!d?.date) continue;
+          map[d.date] = {
+            date: d.date,
+            theme: typeof d.theme === 'string' ? d.theme : '',
+            tasks: Array.isArray(d.tasks)
+              ? d.tasks.filter((t) => typeof t === 'string' && t.trim().length > 0)
+              : [],
+          };
+        }
+
+        setPlanByDate(map);
+      } catch (e) {
+        console.error('failed to fetch /api/goals', e);
+        setPlanByDate({});
+      }
+    };
+
+    fetchGoals();
+  }, []);
 
   const getWeekDates = () => {
     const dates: Date[] = [];
@@ -153,13 +210,6 @@ export default function CalendarView() {
     return dates;
   };
 
-  const getDateKey = (date: Date) => {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
   const weekDates = getWeekDates();
   const monthDates = getMonthDates();
 
@@ -175,16 +225,23 @@ export default function CalendarView() {
     setCurrentDate(newDate);
   };
 
+  // 月を跨いだら選択日をクリア（週表示でも同じselectedDateKeyを使うので、月表示でだけ使われるわけではないが問題なし）
+  useEffect(() => {
+    if (!selectedDateKey) return;
+    const d = new Date(selectedDateKey);
+    if (d.getFullYear() !== currentDate.getFullYear() || d.getMonth() !== currentDate.getMonth()) {
+      // 月表示で見てる月が変わったらクリア（週表示は currentDate 連動なので影響少）
+      setSelectedDateKey(null);
+    }
+  }, [currentDate, selectedDateKey]);
+
   return (
     <div className="min-h-screen bg-gray-50 pb-4">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center">
-            <button
-              onClick={() => history.back()}
-              className="mr-3"
-            >
+            <button onClick={() => history.back()} className="mr-3">
               <ChevronLeft className="w-6 h-6 text-gray-700" />
             </button>
             <h1 className="text-gray-900">学習カレンダー</h1>
@@ -198,22 +255,14 @@ export default function CalendarView() {
           <Button
             onClick={() => setViewMode('week')}
             variant={viewMode === 'week' ? 'default' : 'outline'}
-            className={
-              viewMode === 'week'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1'
-                : 'flex-1'
-            }
+            className={viewMode === 'week' ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1' : 'flex-1'}
           >
             週表示
           </Button>
           <Button
             onClick={() => setViewMode('month')}
             variant={viewMode === 'month' ? 'default' : 'outline'}
-            className={
-              viewMode === 'month'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1'
-                : 'flex-1'
-            }
+            className={viewMode === 'month' ? 'bg-blue-600 hover:bg-blue-700 text-white flex-1' : 'flex-1'}
           >
             月表示
           </Button>
@@ -253,48 +302,65 @@ export default function CalendarView() {
               {weekDates.map((date, idx) => {
                 const dateKey = getDateKey(date);
                 const data = studyData[dateKey];
-                const isToday =
-                  date.toDateString() === new Date().toDateString();
+                const plannedCount = planByDate[dateKey]?.tasks?.length ?? 0;
+                const isToday = date.toDateString() === new Date().toDateString();
+                const isSelected = selectedDateKey === dateKey;
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={idx}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      isToday
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
+                    onClick={() => setSelectedDateKey(dateKey)}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                      isSelected ? 'ring-2 ring-blue-400' : ''
+                    } ${isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="text-center">
-                          <p className="text-xs text-gray-600">
-                            {weekDays[idx]}
-                          </p>
-                          <p
-                            className={`text-gray-900 ${
-                              isToday ? 'text-blue-600' : ''
-                            }`}
-                          >
-                            {date.getDate()}
-                          </p>
-                        </div>
-                        <div
-                          className={`w-3 h-3 rounded-full ${
-                            data?.completed ? 'bg-blue-600' : 'bg-gray-200'
-                          }`}
-                        />
+                    <div className="flex items-center gap-3">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-600">{weekDays[idx]}</p>
+                        <p className={`text-gray-900 ${isToday ? 'text-blue-600' : ''}`}>{date.getDate()}</p>
+                      </div>
+
+                      <div className={`w-3 h-3 rounded-full ${data?.completed ? 'bg-blue-600' : 'bg-gray-200'}`} />
+
+                      <div>
                         <p className="text-sm text-gray-700">
-                          {data?.completed
-                            ? `学習済み (${data.hours ?? 0}時間)`
-                            : '学習なし'}
+                          {data?.completed ? `学習済み (${data.hours ?? 0}時間)` : '学習なし'}
                         </p>
+                        {plannedCount > 0 ? (
+                          <p className="text-xs text-gray-500 mt-1">予定：{plannedCount}件</p>
+                        ) : (
+                          <p className="text-xs text-gray-400 mt-1">予定なし</p>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
+
+            {/* Week: Selected Day Details */}
+            {selectedDateKey && (
+              <div className="mt-4 border-t pt-3">
+                <div className="text-sm text-gray-900 mb-1">{selectedDateKey} の予定</div>
+
+                {planByDate[selectedDateKey]?.theme ? (
+                  <div className="text-xs text-gray-600 mb-2">
+                    テーマ：{planByDate[selectedDateKey].theme}
+                  </div>
+                ) : null}
+
+                {planByDate[selectedDateKey]?.tasks?.length ? (
+                  <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                    {planByDate[selectedDateKey].tasks.map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-500">予定なし</div>
+                )}
+              </div>
+            )}
           </Card>
         )}
 
@@ -316,10 +382,7 @@ export default function CalendarView() {
             {/* Month Day Headers */}
             <div className="grid grid-cols-7 gap-1 mb-2">
               {monthDays.map((day, idx) => (
-                <div
-                  key={idx}
-                  className="text-center text-xs text-gray-600 py-1"
-                >
+                <div key={idx} className="text-center text-xs text-gray-600 py-1">
                   {day}
                 </div>
               ))}
@@ -330,15 +393,20 @@ export default function CalendarView() {
               {monthDates.map((date, idx) => {
                 const dateKey = getDateKey(date);
                 const data = studyData[dateKey];
-                const isToday =
-                  date.toDateString() === new Date().toDateString();
-                const isCurrentMonth =
-                  date.getMonth() === currentDate.getMonth();
+                const plannedCount = planByDate[dateKey]?.tasks?.length ?? 0;
+
+                const isToday = date.toDateString() === new Date().toDateString();
+                const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                const isSelected = selectedDateKey === dateKey;
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={idx}
-                    className={`aspect-square p-1 rounded-lg flex flex-col items-center justify-center ${
+                    onClick={() => setSelectedDateKey(dateKey)}
+                    className={`aspect-square p-1 rounded-lg flex flex-col items-center justify-center transition-all ${
+                      isSelected ? 'ring-2 ring-blue-400' : ''
+                    } ${
                       isToday
                         ? 'bg-blue-600 text-white'
                         : data?.completed
@@ -347,13 +415,45 @@ export default function CalendarView() {
                     } ${!isCurrentMonth ? 'opacity-30' : ''}`}
                   >
                     <span className="text-xs">{date.getDate()}</span>
-                    {data?.completed && (
-                      <div className="w-1 h-1 bg-white rounded-full mt-0.5" />
+
+                    {data?.completed && <div className="w-1 h-1 bg-white rounded-full mt-0.5" />}
+
+                    {plannedCount > 0 && (
+                      <div
+                        className={`text-[10px] mt-0.5 ${
+                          isToday || data?.completed ? 'text-white' : 'text-gray-600'
+                        }`}
+                      >
+                        {plannedCount}件
+                      </div>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
+
+            {/* Month: Selected Day Details */}
+            {selectedDateKey && (
+              <div className="mt-4 border-t pt-3">
+                <div className="text-sm text-gray-900 mb-1">{selectedDateKey} の予定</div>
+
+                {planByDate[selectedDateKey]?.theme ? (
+                  <div className="text-xs text-gray-600 mb-2">
+                    テーマ：{planByDate[selectedDateKey].theme}
+                  </div>
+                ) : null}
+
+                {planByDate[selectedDateKey]?.tasks?.length ? (
+                  <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                    {planByDate[selectedDateKey].tasks.map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-500">予定なし</div>
+                )}
+              </div>
+            )}
           </Card>
         )}
 
@@ -362,21 +462,15 @@ export default function CalendarView() {
           <h3 className="text-gray-900 mb-3">今月の統計</h3>
           <div className="grid grid-cols-3 gap-3">
             <div className="text-center">
-              <p className="text-2xl text-blue-600">
-                {monthlyStats.daysCompleted}
-              </p>
+              <p className="text-2xl text-blue-600">{monthlyStats.daysCompleted}</p>
               <p className="text-xs text-gray-600 mt-1">学習日数</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl text-blue-600">
-                {monthlyStats.totalHours.toFixed(1)}
-              </p>
+              <p className="text-2xl text-blue-600">{monthlyStats.totalHours.toFixed(1)}</p>
               <p className="text-xs text-gray-600 mt-1">学習時間</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl text-blue-600">
-                {monthlyStats.achievementRate}%
-              </p>
+              <p className="text-2xl text-blue-600">{monthlyStats.achievementRate}%</p>
               <p className="text-xs text-gray-600 mt-1">達成率(仮)</p>
             </div>
           </div>
