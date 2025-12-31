@@ -1,15 +1,8 @@
-import Script from "next/script";
 import Link from "next/link";
 
 export default function LandingPage() {
   return (
     <main style={{ minHeight: "100vh", padding: "64px 24px" }}>
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3961829109868432"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em" }}>
           QUALog -試験対策の設計支援と伴走
@@ -101,8 +94,6 @@ export default function LandingPage() {
           >
             お問い合わせ
           </a>
-	 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3961829109868432"
-         crossorigin="anonymous"></script>
         </div>
       </div>
     </main>
