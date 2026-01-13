@@ -14,12 +14,13 @@ const ENV_KEYS_TO_REDACT = [
 ];
 
 function buildSecretValues(): string[] {
+  if (typeof process === "undefined" || !process.env) return [];
   return ENV_KEYS_TO_REDACT.map((key) => process.env[key])
     .filter((value): value is string => typeof value === "string" && value.length > 0);
 }
 
 function redactString(value: string, secrets: string[]): string {
-  let result = value.replace(/OPENAI_API_KEY=[^\\s"]+/g, `OPENAI_API_KEY=${REDACTED}`);
+  let result = value.replace(/OPENAI_API_KEY=[^\s"]+/g, `OPENAI_API_KEY=${REDACTED}`);
   for (const secret of secrets) {
     if (secret.length < 6) continue;
     result = result.split(secret).join(REDACTED);
