@@ -6,6 +6,9 @@ import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 import { hash8, log } from "@/src/lib/logger";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 const MAX_CERT_NAME_LENGTH = 200;
@@ -158,6 +161,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!process.env.OPENAI_API_KEY) {
+      log("error", "OPENAI_API_KEY missing", {
+        requestId,
+        userIdHash: hash8(auth.userId),
+      });
       return NextResponse.json(
         { error: "Server misconfigured" },
         { status: 500 },
@@ -275,6 +282,7 @@ ${examGuideSection}
           },
           max_tokens: OPENAI_MAX_TOKENS,
         },
+        { signal: ac.signal },
       );
       log("info", "plan api openai completed", {
         requestId,
@@ -295,6 +303,8 @@ ${examGuideSection}
         });
       }
       throw error;
+    } finally {
+      clearTimeout(timer);
     }
 
     const msg = completion.choices[0]?.message;
