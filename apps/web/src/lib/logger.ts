@@ -50,5 +50,5 @@ function sanitizeLogValue(value: unknown, secrets: string[], seen: WeakSet<objec
 export function log(level: LogLevel, msg: string, meta: Record<string, unknown> = {}) {
   const secrets = buildSecretValues();
   const sanitized = sanitizeLogValue(meta, secrets, new WeakSet());
-  console[level](JSON.stringify({ level, msg, time: new Date().toISOString(), ...sanitized }));
+  console[level](JSON.stringify({ level, msg, time: new Date().toISOString(), meta: sanitized }));
 }
