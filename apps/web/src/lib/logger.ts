@@ -8,6 +8,8 @@ export function hash8(input: string) {
 
 const REDACTED = "[REDACTED]";
 const ENV_KEYS_TO_REDACT = [
+  "AMPLIFY_OPENAI_API_KEY",
+  "AWS_AMPLIFY_OPENAI_API_KEY",
   "OPENAI_API_KEY",
   "DDB_ACCESS_KEY_ID",
   "DDB_SECRET_ACCESS_KEY",
@@ -20,12 +22,28 @@ function buildSecretValues(): string[] {
 }
 
 function redactString(value: string, secrets: string[]): string {
-  let result = value.replace(/OPENAI_API_KEY=[^\s"]+/g, `OPENAI_API_KEY=${REDACTED}`);
+  let result = maybeRedactBase64(value, secrets);
+  result = result.replace(/OPENAI_API_KEY=[^\s"]+/g, `OPENAI_API_KEY=${REDACTED}`);
   for (const secret of secrets) {
     if (secret.length < 6) continue;
     result = result.split(secret).join(REDACTED);
   }
   return result;
+}
+
+function maybeRedactBase64(value: string, secrets: string[]): string {
+  if (!value || value.length < 40) return value;
+  if (!/^[A-Za-z0-9+/=]+$/.test(value)) return value;
+  if (typeof Buffer === "undefined") return value;
+  try {
+    const decoded = Buffer.from(value, "base64").toString("utf8");
+    if (!decoded) return value;
+    const hasEnvName = ENV_KEYS_TO_REDACT.some((key) => decoded.includes(`${key}=`));
+    const hasSecret = secrets.some((secret) => secret.length >= 6 && decoded.includes(secret));
+    return hasEnvName || hasSecret ? REDACTED : value;
+  } catch {
+    return value;
+  }
 }
 
 function sanitizeLogValue(value: unknown, secrets: string[], seen: WeakSet<object>): unknown {
