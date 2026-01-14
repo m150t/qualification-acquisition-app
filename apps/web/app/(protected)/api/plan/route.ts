@@ -6,6 +6,9 @@ import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 import { hash8, log } from "@/src/lib/logger";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 const MAX_CERT_NAME_LENGTH = 200;
@@ -85,6 +88,16 @@ function normalizeDateString(value: string): string {
   return `${year}-${month}-${day}`;
 }
 
+function getOpenAiApiKey(): string | null {
+  if (typeof process === "undefined" || !process.env) return null;
+  return (
+    process.env.AMPLIFY_OPENAI_API_KEY ??
+    process.env.AWS_AMPLIFY_OPENAI_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    null
+  );
+}
+
 function sanitizePlan(input: unknown): PlanDay[] {
   if (!Array.isArray(input)) return [];
   return input.slice(0, MAX_PLAN_DAYS).map((day) => {
@@ -157,14 +170,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    const openAiApiKey = getOpenAiApiKey();
+    if (!openAiApiKey) {
+      log("error", "OPENAI_API_KEY missing", {
+        requestId,
+        userIdHash: hash8(auth.userId),
+      });
       return NextResponse.json(
         { error: "Server misconfigured" },
         { status: 500 },
       );
     }
     const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: openAiApiKey,
     });
 
     const ip = getClientIp(req.headers);
@@ -275,6 +293,7 @@ ${examGuideSection}
           },
           max_tokens: OPENAI_MAX_TOKENS,
         },
+        { signal: ac.signal },
       );
       log("info", "plan api openai completed", {
         requestId,
@@ -295,6 +314,8 @@ ${examGuideSection}
         });
       }
       throw error;
+    } finally {
+      clearTimeout(timer);
     }
 
     const msg = completion.choices[0]?.message;
