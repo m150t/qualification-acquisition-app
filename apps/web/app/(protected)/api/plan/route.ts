@@ -228,7 +228,7 @@ ${examGuideSection}
 テーマ・タスクは必ず日本語で記述してください。
 `;
 
-    const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "8000");
+    const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "20000");
     const timeoutMs = Number.isFinite(rawTimeoutMs)
       ? Math.min(Math.max(rawTimeoutMs, 1000), 60000)
       : 8000;
