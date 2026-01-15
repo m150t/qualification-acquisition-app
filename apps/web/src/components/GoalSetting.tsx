@@ -30,6 +30,10 @@ type StudyGoal = {
   weeklyHours: number | null;
 };
 
+type ExistingGoal = StudyGoal & {
+  certCode: string | null;
+};
+
 type PlanItem = {
   date: string;
   title: string;
@@ -107,7 +111,9 @@ function normalizePlanItems(items: ApiPlanItem[]): DayPlan[] {
           ? item.topics
           : [];
       const topics = rawTopics.map((t) => String(t)).filter(Boolean);
-      const date = toDateOnlyString(new Date(today.getTime() + index * MS_PER_DAY));
+      const date = item.date
+        ? item.date
+        : toDateOnlyString(new Date(today.getTime() + index * MS_PER_DAY));
       return {
         dayIndex: index + 1,
         date,
@@ -202,9 +208,11 @@ export default function GoalSetting() {
   const [plan, setPlan] = useState<DayPlan[]>([]);
   const [showPlan, setShowPlan] = useState(false);
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
-  const [existingGoal, setExistingGoal] = useState<StudyGoal | null>(null);
+  const [existingGoal, setExistingGoal] = useState<ExistingGoal | null>(null);
+  const [existingGoalPlan, setExistingGoalPlan] = useState<DayPlan[] | null>(null);
   const [isLoadingGoal, setIsLoadingGoal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [isLoadingExistingPlan, setIsLoadingExistingPlan] = useState(false);
 
   const availableCertifications = useMemo<Certification[]>(() => {
     const baseList =
@@ -311,16 +319,24 @@ export default function GoalSetting() {
         const data = await res.json();
         if (data.goal) {
           setExistingGoal({
+            certCode: data.goal.certCode ?? null,
             certName: data.goal.certName,
             examDate: data.goal.examDate,
             weeklyHours: data.goal.weeklyHours ?? null,
           });
+          setExistingGoalPlan(
+            Array.isArray(data.plan)
+              ? normalizePlanItems(data.plan as ApiPlanItem[])
+              : [],
+          );
         } else {
           setExistingGoal(null);
+          setExistingGoalPlan(null);
         }
       } catch (error) {
         console.error('load goal error', error);
         setExistingGoal(null);
+        setExistingGoalPlan(null);
       } finally {
         setIsLoadingGoal(false);
       }
@@ -424,7 +440,8 @@ export default function GoalSetting() {
         : parsedWeeklyHours;
 
     // 1. Goal（試験情報）を localStorage に保存
-    const goalPayload: StudyGoal = {
+    const goalPayload: ExistingGoal = {
+      certCode: selectedCertCode,
       certName: effectiveCertName,
       examDate,
       weeklyHours: numericWeeklyHours, // number | null
@@ -475,10 +492,74 @@ export default function GoalSetting() {
       }
 
       setExistingGoal(goalPayload);
+      setExistingGoalPlan(plan);
       alert('目標を保存しました！');
     } catch (e) {
       console.error(e);
       alert('通信エラーで保存に失敗しました。接続状況を確認して再度お試しください。');
+    }
+  };
+
+  const handleEditExistingGoal = async () => {
+    setIsLoadingExistingPlan(true);
+    try {
+      let goalData = existingGoal;
+      let planData = existingGoalPlan;
+
+      if (!goalData || !planData) {
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch('/api/goals', {
+          headers: authHeaders,
+        });
+
+        if (!res.ok) {
+          console.error('failed to load goal for edit', await res.text());
+          alert('目標情報の読み込みに失敗しました。時間をおいて再度お試しください。');
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.goal) {
+          alert('現在の目標が見つかりませんでした。');
+          return;
+        }
+
+        goalData = {
+          certCode: data.goal.certCode ?? null,
+          certName: data.goal.certName,
+          examDate: data.goal.examDate,
+          weeklyHours: data.goal.weeklyHours ?? null,
+        };
+        planData = Array.isArray(data.plan)
+          ? normalizePlanItems(data.plan as ApiPlanItem[])
+          : [];
+        setExistingGoal(goalData);
+        setExistingGoalPlan(planData);
+      }
+
+      const resolvedCertCode =
+        goalData.certCode &&
+        availableCertifications.some((cert) => cert.code === goalData.certCode)
+          ? goalData.certCode
+          : 'other';
+
+      setSelectedCertCode(resolvedCertCode);
+      setCustomCertName(resolvedCertCode === 'other' ? goalData.certName ?? '' : '');
+      setExamDate(goalData.examDate || getTodayYmd());
+      setWeeklyHours(
+        goalData.weeklyHours != null ? String(goalData.weeklyHours) : '',
+      );
+      setWeeksUntilExam(calcWeeksUntilExam(goalData.examDate));
+
+      const fallbackPlan = buildFallbackPlan(goalData.examDate, resolvedCertCode);
+      setPlan(planData && planData.length > 0 ? planData : fallbackPlan);
+      setEditingDayIndex(null);
+      setShowPlan(true);
+    } catch (error) {
+      console.error('load goal for edit error', error);
+      alert('通信エラーで読み込みに失敗しました。接続状況を確認して再度お試しください。');
+    } finally {
+      setIsLoadingExistingPlan(false);
     }
   };
 
@@ -532,6 +613,13 @@ export default function GoalSetting() {
                 新しい目標を保存すると、この内容が上書きされます。
               </p>
             </div>
+            <Button
+              onClick={handleEditExistingGoal}
+              disabled={isLoadingExistingPlan}
+              className="mt-3 w-full bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {isLoadingExistingPlan ? '目標を読み込み中...' : '計画を修正する'}
+            </Button>
           </Card>
         )}
 
