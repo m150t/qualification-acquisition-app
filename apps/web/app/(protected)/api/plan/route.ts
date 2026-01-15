@@ -5,6 +5,7 @@ import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 import { hash8, log } from "@/src/lib/logger";
+import { ensureServerEnv } from "@/src/lib/envServer";
 
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
@@ -157,14 +158,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    ensureServerEnv();
+    const openAiApiKey = process.env.OPENAI_API_KEY;
+    if (!openAiApiKey) {
+      log("error", "OPENAI_API_KEY missing", {
+        requestId,
+        userIdHash: hash8(auth.userId),
+        hasAmplifyOpenAiKey: Boolean(process.env.AMPLIFY_OPENAI_API_KEY),
+        hasAwsAmplifyOpenAiKey: Boolean(process.env.AWS_AMPLIFY_OPENAI_API_KEY),
+        hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
+      });
       return NextResponse.json(
         { error: "Server misconfigured" },
         { status: 500 },
       );
     }
     const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: openAiApiKey,
     });
 
     const ip = getClientIp(req.headers);
@@ -275,6 +285,7 @@ ${examGuideSection}
           },
           max_tokens: OPENAI_MAX_TOKENS,
         },
+        { signal: ac.signal },
       );
       log("info", "plan api openai completed", {
         requestId,
@@ -295,6 +306,8 @@ ${examGuideSection}
         });
       }
       throw error;
+    } finally {
+      clearTimeout(timer);
     }
 
     const msg = completion.choices[0]?.message;
