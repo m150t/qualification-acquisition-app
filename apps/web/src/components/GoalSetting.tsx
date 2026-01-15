@@ -416,6 +416,7 @@ export default function GoalSetting() {
       return;
     }
 
+    const shouldResetReports = Boolean(existingGoal);
     const parsedWeeklyHours = weeklyHours === '' ? null : Number(weeklyHours);
     const numericWeeklyHours =
       parsedWeeklyHours === null || Number.isNaN(parsedWeeklyHours)
@@ -452,6 +453,7 @@ export default function GoalSetting() {
       weeklyHours: numericWeeklyHours,
       weeksUntilExam: displayWeeks, // 表示に使っている週数を保存
       plan: apiPlan,
+      resetReports: shouldResetReports,
     };
 
     try {
