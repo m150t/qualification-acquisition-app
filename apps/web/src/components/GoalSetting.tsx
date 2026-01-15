@@ -25,6 +25,7 @@ type DayPlan = {
 };
 
 type StudyGoal = {
+  certCode?: string;
   certName: string;
   examDate: string; // 'YYYY-MM-DD'
   weeklyHours: number | null;
