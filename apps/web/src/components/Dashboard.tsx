@@ -380,7 +380,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                   <span className="text-blue-100">学習進捗</span>
-                  <span className="text-white">{totalProgress}%</span>
+                  <span className="text-white">{studyProgressText}</span>
                 </div>
                 <Progress value={totalProgress} className="h-2 bg-white/20" />
               </div>
