@@ -274,7 +274,7 @@ ${examGuideSection}
 必ず ${planWindow.startDate} から ${planWindow.endDate} までの連続した日付を ${planWindow.totalDays} 日分すべて含めてください。
 `;
 
-    const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "20000");
+    const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "30000");
     const timeoutMs = Number.isFinite(rawTimeoutMs)
       ? Math.min(Math.max(rawTimeoutMs, 1000), 60000)
       : 8000;
