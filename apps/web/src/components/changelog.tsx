@@ -79,6 +79,8 @@ export default function ChangeLog() {
         <div style={{ marginTop: 28, color: "#333", lineHeight: 1.9, fontSize: 15 }}>
           <Section title="2026-01">
             <ul style={{ marginTop: 8, paddingLeft: 18 }}>
+              <li>計画修正機能を追加</li>
+              <li>ホーム画面の軽微なUI改善</li>
               <li>学習カレンダーに「日別タスク表示」を追加</li>
               <li>週表示・月表示の両方からタスク詳細を確認可能に</li>
               <li>日報ページに「今日のタスク」を表示</li>
