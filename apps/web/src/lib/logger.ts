@@ -8,11 +8,11 @@ export function hash8(input: string) {
 
 const REDACTED = "[REDACTED]";
 const ENV_KEYS_TO_REDACT = [
-  "AMPLIFY_OPENAI_API_KEY",
-  "AWS_AMPLIFY_OPENAI_API_KEY",
   "OPENAI_API_KEY",
   "DDB_ACCESS_KEY_ID",
   "DDB_SECRET_ACCESS_KEY",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_ACCESS_KEY_ID",
 ];
 
 function buildSecretValues(): string[] {
@@ -24,6 +24,8 @@ function buildSecretValues(): string[] {
 function redactString(value: string, secrets: string[]): string {
   let result = maybeRedactBase64(value, secrets);
   result = result.replace(/OPENAI_API_KEY=[^\s"]+/g, `OPENAI_API_KEY=${REDACTED}`);
+  result = result.replace(/AWS_SECRET_ACCESS_KEY=[^\s"]+/g, `AWS_SECRET_ACCESS_KEY=${REDACTED}`);
+  result = result.replace(/AWS_ACCESS_KEY_ID=[^\s"]+/g, `AWS_ACCESS_KEY_ID=${REDACTED}`);
   for (const secret of secrets) {
     if (secret.length < 6) continue;
     result = result.split(secret).join(REDACTED);

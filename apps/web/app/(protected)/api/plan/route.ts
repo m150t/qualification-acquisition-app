@@ -5,6 +5,10 @@ import { ddb } from "@/src/lib/dynamodb";
 import { requireAuth } from "@/src/lib/authServer";
 import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 import { hash8, log } from "@/src/lib/logger";
+import { ensureServerEnv } from "@/src/lib/envServer";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -170,11 +174,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const openAiApiKey = getOpenAiApiKey();
+    ensureServerEnv();
+    const openAiApiKey = process.env.OPENAI_API_KEY;
     if (!openAiApiKey) {
       log("error", "OPENAI_API_KEY missing", {
         requestId,
         userIdHash: hash8(auth.userId),
+        hasAmplifyOpenAiKey: Boolean(process.env.AMPLIFY_OPENAI_API_KEY),
+        hasAwsAmplifyOpenAiKey: Boolean(process.env.AWS_AMPLIFY_OPENAI_API_KEY),
+        hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
       });
       return NextResponse.json(
         { error: "Server misconfigured" },
