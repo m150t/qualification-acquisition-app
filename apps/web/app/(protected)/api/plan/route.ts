@@ -18,6 +18,7 @@ const MAX_THEME_LENGTH = 200;
 const MAX_EXAM_GUIDE_CHARS = 1500;
 const OPENAI_MAX_TOKENS = 1200;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type GeneratePlanRequest = {
   goal: {
@@ -84,6 +85,29 @@ function normalizeDateString(value: string): string {
   const month = String(parsed.getMonth() + 1).padStart(2, "0");
   const day = String(parsed.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatDateOnly(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getPlanWindow(examDateInput: string, today = new Date()) {
+  const normalized = normalizeDateString(examDateInput);
+  const examDate = new Date(normalized);
+  if (Number.isNaN(examDate.getTime())) return null;
+  const start = new Date(today);
+  start.setHours(0, 0, 0, 0);
+  const diffMs = examDate.getTime() - start.getTime();
+  const daysUntilExam = Math.max(1, Math.ceil(diffMs / MS_PER_DAY));
+  const end = new Date(start.getTime() + (daysUntilExam - 1) * MS_PER_DAY);
+  return {
+    startDate: formatDateOnly(start),
+    endDate: formatDateOnly(end),
+    totalDays: Math.min(daysUntilExam, MAX_PLAN_DAYS),
+  };
 }
 
 function getOpenAiApiKey(): string | null {
@@ -208,10 +232,17 @@ export async function POST(req: NextRequest) {
 
     const certName = String(goal?.certName ?? "").trim().slice(0, MAX_CERT_NAME_LENGTH);
     const examDate = String(goal?.examDate ?? "").trim().slice(0, MAX_EXAM_DATE_LENGTH);
+    const planWindow = getPlanWindow(examDate);
 
     if (!certName || !examDate) {
       return NextResponse.json(
         { error: "goal.certName と goal.examDate は必須です" },
+        { status: 400 },
+      );
+    }
+    if (!planWindow) {
+      return NextResponse.json(
+        { error: "goal.examDate の形式が不正です" },
         { status: 400 },
       );
     }
@@ -226,6 +257,7 @@ export async function POST(req: NextRequest) {
     const prompt = `
 資格名: ${certName}
 試験日: ${examDate}
+学習期間: ${planWindow.startDate} から ${planWindow.endDate} までの合計 ${planWindow.totalDays} 日（試験日は含めない）
 目標の学習時間: ${goal.weeklyHours ?? "未設定"} 時間
 ${examGuideSection}
 
@@ -239,6 +271,7 @@ ${examGuideSection}
   "tasks": ["具体的なタスク1", "具体的なタスク2"]
 }
 テーマ・タスクは必ず日本語で記述してください。
+必ず ${planWindow.startDate} から ${planWindow.endDate} までの連続した日付を ${planWindow.totalDays} 日分すべて含めてください。
 `;
 
     const rawTimeoutMs = Number(process.env.PLAN_API_TIMEOUT_MS ?? "20000");
@@ -273,6 +306,8 @@ ${examGuideSection}
                 properties: {
                   plan: {
                     type: "array",
+                    minItems: planWindow.totalDays,
+                    maxItems: planWindow.totalDays,
                     items: {
                       type: "object",
                       additionalProperties: false,
