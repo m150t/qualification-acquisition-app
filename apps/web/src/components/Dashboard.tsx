@@ -1,7 +1,7 @@
 // src/components/Dashboard.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -74,106 +74,125 @@ export default function Dashboard() {
   // -----------------------------
   // API から goal / plan / reports を読む
   // -----------------------------
-  useEffect(() => {
-    const fetchAll = async () => {
-      let authHeaders: Record<string, string>;
-      try {
-        authHeaders = await getAuthHeaders();
-      } catch (error) {
-        console.error("failed to load auth headers", error);
-        setGoal(null);
-        setTasks([]);
-        setReports([]);
-        setTotalPlannedTasks(0);
-        return;
-      }
+  const fetchAll = useCallback(async () => {
+    let authHeaders: Record<string, string>;
+    try {
+      authHeaders = await getAuthHeaders();
+    } catch (error) {
+      console.error("failed to load auth headers", error);
+      setGoal(null);
+      setTasks([]);
+      setReports([]);
+      setTotalPlannedTasks(0);
+      return;
+    }
 
-      // 1. 目標＋計画
-      try {
-        const goalRes = await fetch('/api/goals', {
-          headers: authHeaders,
-        });
-        if (goalRes.ok) {
-          const data = await goalRes.json();
-          // 期待する形：
-          // { goal: { certName, examDate, weeklyHours }, plan: DayPlan[] }
-          if (data.goal) {
-            setGoal({
-              certName: data.goal.certName,
-              examDate: data.goal.examDate,
-              weeklyHours: data.goal.weeklyHours ?? null,
-            });
-          }
+    // 1. 目標＋計画
+    try {
+      const goalRes = await fetch('/api/goals', {
+        headers: authHeaders,
+      });
+      if (goalRes.ok) {
+        const data = await goalRes.json();
+        // 期待する形：
+        // { goal: { certName, examDate, weeklyHours }, plan: DayPlan[] }
+        if (data.goal) {
+          setGoal({
+            certName: data.goal.certName,
+            examDate: data.goal.examDate,
+            weeklyHours: data.goal.weeklyHours ?? null,
+          });
+        }
 
-          if (Array.isArray(data.plan)) {
-            const plannedTasksCount = data.plan.reduce(
-              (sum: number, p: DayPlan) => {
-                const rawTasks = Array.isArray((p as any).topics)
-                  ? (p as any).topics
-                  : Array.isArray((p as any).tasks)
-                    ? (p as any).tasks
-                    : [];
-                return sum + rawTasks.length;
-              },
-              0,
-            );
-            setTotalPlannedTasks(plannedTasksCount);
-
-            // 今日の日付の DayPlan を探して tasks に変換
-            const todayPlan: DayPlan | undefined = data.plan.find(
-              (p: DayPlan) => p.date === todayKey,
-            );
-
-            if (todayPlan) {
-              const rawTopics = Array.isArray((todayPlan as any).topics)
-                ? (todayPlan as any).topics
-                : Array.isArray((todayPlan as any).tasks)
-                  ? (todayPlan as any).tasks
+        if (Array.isArray(data.plan)) {
+          const plannedTasksCount = data.plan.reduce(
+            (sum: number, p: DayPlan) => {
+              const rawTasks = Array.isArray((p as any).topics)
+                ? (p as any).topics
+                : Array.isArray((p as any).tasks)
+                  ? (p as any).tasks
                   : [];
-              const uiTasks: UiTask[] = rawTopics.map(
-                (t: string, idx: number) => ({
-                  id: idx + 1,
-                  title: t,
-                  duration: '30分', // ひとまず固定表示
-                  category: todayPlan.theme,
-                }),
-              );
-              setTasks(uiTasks);
-            } else {
-              setTasks([]);
-            }
+              return sum + rawTasks.length;
+            },
+            0,
+          );
+          setTotalPlannedTasks(plannedTasksCount);
+
+          // 今日の日付の DayPlan を探して tasks に変換
+          const todayPlan: DayPlan | undefined = data.plan.find(
+            (p: DayPlan) => p.date === todayKey,
+          );
+
+          if (todayPlan) {
+            const rawTopics = Array.isArray((todayPlan as any).topics)
+              ? (todayPlan as any).topics
+              : Array.isArray((todayPlan as any).tasks)
+                ? (todayPlan as any).tasks
+                : [];
+            const uiTasks: UiTask[] = rawTopics.map(
+              (t: string, idx: number) => ({
+                id: idx + 1,
+                title: t,
+                duration: '30分', // ひとまず固定表示
+                category: todayPlan.theme,
+              }),
+            );
+            setTasks(uiTasks);
           } else {
-            setTotalPlannedTasks(0);
+            setTasks([]);
           }
         } else {
-          console.error('failed to load /api/goals', await goalRes.text());
           setTotalPlannedTasks(0);
         }
-      } catch (e) {
-        console.error('error fetching /api/goals', e);
+      } else {
+        console.error('failed to load /api/goals', await goalRes.text());
         setTotalPlannedTasks(0);
       }
+    } catch (e) {
+      console.error('error fetching /api/goals', e);
+      setTotalPlannedTasks(0);
+    }
 
-      // 2. 日報一覧
-      try {
-        const repRes = await fetch('/api/reports', {
-          headers: authHeaders,
-        });
-        if (repRes.ok) {
-          const data = await repRes.json();
-          if (Array.isArray(data.reports)) {
-            setReports(data.reports);
-          }
-        } else {
-          console.error('failed to load /api/reports', await repRes.text());
+    // 2. 日報一覧
+    try {
+      const repRes = await fetch('/api/reports', {
+        headers: authHeaders,
+      });
+      if (repRes.ok) {
+        const data = await repRes.json();
+        if (Array.isArray(data.reports)) {
+          setReports(data.reports);
         }
-      } catch (e) {
-        console.error('error fetching /api/reports', e);
+      } else {
+        console.error('failed to load /api/reports', await repRes.text());
+      }
+    } catch (e) {
+      console.error('error fetching /api/reports', e);
+    }
+  }, [todayKey]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchAll();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAll();
       }
     };
 
-    fetchAll();
-  }, [todayKey]);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchAll]);
 
   // 日付ごと「勉強したか」
   const dateHasStudy = useMemo(() => {
@@ -541,6 +560,11 @@ export default function Dashboard() {
                   <p className="mt-1 text-sm text-gray-700">
                     {latestReport.content || '（内容未入力）'}
                   </p>
+                  {latestReport.aiComment && (
+                    <p className="mt-2 text-xs text-gray-700">
+                      AIコメント：{latestReport.aiComment}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-gray-700">
