@@ -441,7 +441,7 @@ export default function GoalSetting() {
         : parsedWeeklyHours;
 
     // 1. Goal（試験情報）を localStorage に保存
-    const goalPayload: StudyGoal = {
+    const goalPayload: ExistingGoal = {
       certCode: selectedCertCode,
       certName: effectiveCertName,
       examDate,
