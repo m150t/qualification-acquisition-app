@@ -1,27 +1,5 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import Providers from "./Providers";
-
-export const metadata: Metadata = {
-  title: "QUALog",
-  description: "資格学習の計画と進捗をサポート",
-  other: {
-    "google-adsense-account": "ca-pub-3961829109868432",
-  },
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="ja">
-      <body>
-        <Providers>{children}</Providers>
-      </body>
-    </html>
-  );
-}
-
-import "./globals.css";
-import type { Metadata } from "next";
 import Script from "next/script";
 import Providers from "./Providers";
 
