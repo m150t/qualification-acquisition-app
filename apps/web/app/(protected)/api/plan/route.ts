@@ -86,6 +86,16 @@ function normalizeDateString(value: string): string {
   return `${year}-${month}-${day}`;
 }
 
+function getOpenAiApiKey(): string | null {
+  if (typeof process === "undefined" || !process.env) return null;
+  return (
+    process.env.AMPLIFY_OPENAI_API_KEY ??
+    process.env.AWS_AMPLIFY_OPENAI_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    null
+  );
+}
+
 function sanitizePlan(input: unknown): PlanDay[] {
   if (!Array.isArray(input)) return [];
   return input.slice(0, MAX_PLAN_DAYS).map((day) => {

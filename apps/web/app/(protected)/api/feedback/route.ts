@@ -20,6 +20,16 @@ function safeNumber(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function getOpenAiApiKey(): string | null {
+  if (typeof process === "undefined" || !process.env) return null;
+  return (
+    process.env.AMPLIFY_OPENAI_API_KEY ??
+    process.env.AWS_AMPLIFY_OPENAI_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    null
+  );
+}
+
 type PlanDay = { date: string; theme?: string; tasks?: string[] };
 
 async function getPlanDay(userId: string, date: string, requestId: string): Promise<PlanDay | null> {
