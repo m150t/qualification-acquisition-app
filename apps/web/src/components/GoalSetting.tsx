@@ -214,6 +214,7 @@ export default function GoalSetting() {
   const [isLoadingGoal, setIsLoadingGoal] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [isLoadingExistingPlan, setIsLoadingExistingPlan] = useState(false);
+  const [preserveReportsOnSave, setPreserveReportsOnSave] = useState(false);
 
   const availableCertifications = useMemo<Certification[]>(() => {
     const baseList =
@@ -359,6 +360,7 @@ export default function GoalSetting() {
       return;
     }
 
+    setPreserveReportsOnSave(false);
     const parsedWeeklyHours = weeklyHours === '' ? null : Number(weeklyHours);
     const numericWeeklyHours =
       parsedWeeklyHours === null || Number.isNaN(parsedWeeklyHours)
@@ -433,7 +435,7 @@ export default function GoalSetting() {
       return;
     }
 
-    const shouldResetReports = Boolean(existingGoal);
+    const shouldResetReports = Boolean(existingGoal) && !preserveReportsOnSave;
     const parsedWeeklyHours = weeklyHours === '' ? null : Number(weeklyHours);
     const numericWeeklyHours =
       parsedWeeklyHours === null || Number.isNaN(parsedWeeklyHours)
@@ -494,6 +496,7 @@ export default function GoalSetting() {
 
       setExistingGoal(goalPayload);
       setExistingGoalPlan(plan);
+      setPreserveReportsOnSave(false);
       alert('目標を保存しました！');
     } catch (e) {
       console.error(e);
@@ -503,6 +506,7 @@ export default function GoalSetting() {
 
   const handleEditExistingGoal = async () => {
     setIsLoadingExistingPlan(true);
+    setPreserveReportsOnSave(true);
     try {
       let goalData = existingGoal;
       let planData = existingGoalPlan;
@@ -516,12 +520,14 @@ export default function GoalSetting() {
         if (!res.ok) {
           console.error('failed to load goal for edit', await res.text());
           alert('目標情報の読み込みに失敗しました。時間をおいて再度お試しください。');
+          setPreserveReportsOnSave(false);
           return;
         }
 
         const data = await res.json();
         if (!data.goal) {
           alert('現在の目標が見つかりませんでした。');
+          setPreserveReportsOnSave(false);
           return;
         }
 
@@ -559,6 +565,7 @@ export default function GoalSetting() {
     } catch (error) {
       console.error('load goal for edit error', error);
       alert('通信エラーで読み込みに失敗しました。接続状況を確認して再度お試しください。');
+      setPreserveReportsOnSave(false);
     } finally {
       setIsLoadingExistingPlan(false);
     }
