@@ -46,6 +46,14 @@ type UiTask = {
   category?: string;
 };
 
+function toNumber(value: unknown): number | null {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  if (typeof parsed === "number" && Number.isFinite(parsed)) {
+    return parsed;
+  }
+  return null;
+}
+
 function makeDateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -194,16 +202,38 @@ export default function Dashboard() {
     };
   }, [fetchAll]);
 
-  // 日付ごと「勉強したか」
+  // 日付ごと最新の日報
+  const reportsByDate = useMemo(() => {
+    const map = new Map<string, Report>();
+    reports.forEach((r) => {
+      if (!r.date) return;
+      const existing = map.get(r.date);
+      if (!existing) {
+        map.set(r.date, r);
+        return;
+      }
+      const existingTime = Number.isNaN(new Date(existing.savedAt).getTime())
+        ? 0
+        : new Date(existing.savedAt).getTime();
+      const currentTime = Number.isNaN(new Date(r.savedAt).getTime())
+        ? 0
+        : new Date(r.savedAt).getTime();
+      if (currentTime > existingTime) {
+        map.set(r.date, r);
+      }
+    });
+    return map;
+  }, [reports]);
+
   const dateHasStudy = useMemo(() => {
     const s = new Set<string>();
-    reports.forEach((r) => {
+    reportsByDate.forEach((r) => {
       if (r.studyTime && r.studyTime > 0) {
         s.add(r.date);
       }
     });
     return s;
-  }, [reports]);
+  }, [reportsByDate]);
 
   // 最新日報
   const latestReport = useMemo(() => {
@@ -252,20 +282,23 @@ export default function Dashboard() {
     return count;
   }, [todayDate, dateHasStudy]);
 
-  // 完了タスク数（全日報の tasksCompleted 合計）
+  // 完了タスク数（各日付の最新日報の tasksCompleted 合計）
   const totalTasksCompleted = useMemo(
     () =>
-      reports.reduce(
-        (sum, r) => sum + (r.tasksCompleted ?? 0),
+      Array.from(reportsByDate.values()).reduce(
+        (sum, r) => sum + (toNumber(r.tasksCompleted) ?? 0),
         0,
       ),
-    [reports],
+    [reportsByDate],
   );
 
   // 総学習時間（時間）
   const totalStudyHours = useMemo(() => {
-    return reports.reduce((sum, r) => sum + (r.studyTime ?? 0), 0);
-  }, [reports]);
+    return Array.from(reportsByDate.values()).reduce(
+      (sum, r) => sum + (toNumber(r.studyTime) ?? 0),
+      0,
+    );
+  }, [reportsByDate]);
 
   // ざっくり学習進捗
   const totalProgress = useMemo(() => {
@@ -282,8 +315,8 @@ export default function Dashboard() {
   }, [totalStudyHours]);
 
   const studyProgressText = useMemo(() => {
-    return `${totalTasksCompleted}/${totalPlannedTasks}`;
-  }, [totalTasksCompleted, totalPlannedTasks]);
+    return `${totalProgress}%`;
+  }, [totalProgress]);
 
   // あいさつ（今の時刻で判定）
   const greeting = useMemo(() => {
