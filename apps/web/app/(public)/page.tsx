@@ -16,7 +16,7 @@ export default function LandingPage() {
 
         <p style={{ marginTop: 24, fontSize: 14, color: "#555" }}>
            🔧 最近のアップデート：
-            カレンダー、日報入力画面に「日別タスク表示」を追加しました（2026/1）
+            計画変更機能を追加しました（2026/1）
         </p>
 
         <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap" }}>
