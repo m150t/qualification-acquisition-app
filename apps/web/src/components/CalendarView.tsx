@@ -471,7 +471,7 @@ export default function CalendarView() {
             </div>
             <div className="text-center">
               <p className="text-2xl text-blue-600">{monthlyStats.achievementRate}%</p>
-              <p className="text-xs text-gray-600 mt-1">達成率(仮)</p>
+              <p className="text-xs text-gray-600 mt-1">達成率</p>
             </div>
           </div>
         </Card>
