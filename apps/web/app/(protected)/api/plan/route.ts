@@ -10,6 +10,9 @@ import { ensureServerEnv } from "@/src/lib/envServer";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 const MAX_CERT_NAME_LENGTH = 200;
@@ -87,6 +90,16 @@ function normalizeDateString(value: string): string {
   const month = String(parsed.getMonth() + 1).padStart(2, "0");
   const day = String(parsed.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getOpenAiApiKey(): string | null {
+  if (typeof process === "undefined" || !process.env) return null;
+  return (
+    process.env.AMPLIFY_OPENAI_API_KEY ??
+    process.env.AWS_AMPLIFY_OPENAI_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    null
+  );
 }
 
 function sanitizePlan(input: unknown): PlanDay[] {
