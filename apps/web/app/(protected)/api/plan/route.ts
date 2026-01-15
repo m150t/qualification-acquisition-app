@@ -7,12 +7,6 @@ import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
 import { hash8, log } from "@/src/lib/logger";
 import { ensureServerEnv } from "@/src/lib/envServer";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const CERTIFICATIONS_TABLE =
   process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 const MAX_CERT_NAME_LENGTH = 200;
