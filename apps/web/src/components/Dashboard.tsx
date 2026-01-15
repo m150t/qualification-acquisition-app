@@ -46,6 +46,14 @@ type UiTask = {
   category?: string;
 };
 
+function toNumber(value: unknown): number | null {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  if (typeof parsed === "number" && Number.isFinite(parsed)) {
+    return parsed;
+  }
+  return null;
+}
+
 function makeDateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -278,7 +286,7 @@ export default function Dashboard() {
   const totalTasksCompleted = useMemo(
     () =>
       Array.from(reportsByDate.values()).reduce(
-        (sum, r) => sum + (r.tasksCompleted ?? 0),
+        (sum, r) => sum + (toNumber(r.tasksCompleted) ?? 0),
         0,
       ),
     [reportsByDate],
@@ -287,7 +295,7 @@ export default function Dashboard() {
   // 総学習時間（時間）
   const totalStudyHours = useMemo(() => {
     return Array.from(reportsByDate.values()).reduce(
-      (sum, r) => sum + (r.studyTime ?? 0),
+      (sum, r) => sum + (toNumber(r.studyTime) ?? 0),
       0,
     );
   }, [reportsByDate]);
