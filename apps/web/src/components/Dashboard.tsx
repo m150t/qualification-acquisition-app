@@ -58,6 +58,7 @@ export default function Dashboard() {
   const [goal, setGoal] = useState<StudyGoal | null>(null);
   const [tasks, setTasks] = useState<UiTask[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [totalPlannedTasks, setTotalPlannedTasks] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isProcessingResult, setIsProcessingResult] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -83,6 +84,7 @@ export default function Dashboard() {
         setGoal(null);
         setTasks([]);
         setReports([]);
+        setTotalPlannedTasks(0);
         return;
       }
 
@@ -104,6 +106,19 @@ export default function Dashboard() {
           }
 
           if (Array.isArray(data.plan)) {
+            const plannedTasksCount = data.plan.reduce(
+              (sum: number, p: DayPlan) => {
+                const rawTasks = Array.isArray((p as any).topics)
+                  ? (p as any).topics
+                  : Array.isArray((p as any).tasks)
+                    ? (p as any).tasks
+                    : [];
+                return sum + rawTasks.length;
+              },
+              0,
+            );
+            setTotalPlannedTasks(plannedTasksCount);
+
             // 今日の日付の DayPlan を探して tasks に変換
             const todayPlan: DayPlan | undefined = data.plan.find(
               (p: DayPlan) => p.date === todayKey,
@@ -127,12 +142,16 @@ export default function Dashboard() {
             } else {
               setTasks([]);
             }
+          } else {
+            setTotalPlannedTasks(0);
           }
         } else {
           console.error('failed to load /api/goals', await goalRes.text());
+          setTotalPlannedTasks(0);
         }
       } catch (e) {
         console.error('error fetching /api/goals', e);
+        setTotalPlannedTasks(0);
       }
 
       // 2. 日報一覧
@@ -224,50 +243,28 @@ export default function Dashboard() {
     [reports],
   );
 
-  // 今週の学習時間（時間）
-  const weekStudyHours = useMemo(() => {
-    const base = new Date(todayDate);
-    const day = base.getDay(); // 0:日〜6:土
-    const diff = (day === 0 ? -6 : 1) - day; // 月曜日に合わせる
-    const monday = new Date(base);
-    monday.setDate(base.getDate() + diff);
-    monday.setHours(0, 0, 0, 0);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-
-    const startKey = makeDateKey(monday);
-    const endKey = makeDateKey(sunday);
-
-    const total = reports.reduce((sum, r) => {
-      if (r.date >= startKey && r.date <= endKey) {
-        return sum + (r.studyTime ?? 0);
-      }
-      return sum;
-    }, 0);
-
-    return total;
-  }, [todayDate, reports]);
+  // 総学習時間（時間）
+  const totalStudyHours = useMemo(() => {
+    return reports.reduce((sum, r) => sum + (r.studyTime ?? 0), 0);
+  }, [reports]);
 
   // ざっくり学習進捗
   const totalProgress = useMemo(() => {
-    if (!goal?.weeklyHours || daysUntilExam == null || daysUntilExam <= 0) {
-      return 0;
-    }
-
-    const weeksTotal = Math.ceil(daysUntilExam / 7);
-    const expectedHours = goal.weeklyHours * weeksTotal;
-    if (!expectedHours) return 0;
-
-    const actualHours = reports.reduce(
-      (sum, r) => sum + (r.studyTime ?? 0),
-      0,
-    );
-
+    if (!totalPlannedTasks) return 0;
     return Math.min(
       100,
-      Math.round((actualHours / expectedHours) * 100),
+      Math.round((totalTasksCompleted / totalPlannedTasks) * 100),
     );
-  }, [goal, daysUntilExam, reports]);
+  }, [totalPlannedTasks, totalTasksCompleted]);
+
+  const totalStudyHoursText = useMemo(() => {
+    if (!Number.isFinite(totalStudyHours)) return '0';
+    return String(totalStudyHours);
+  }, [totalStudyHours]);
+
+  const studyProgressText = useMemo(() => {
+    return `${totalTasksCompleted}/${totalPlannedTasks}`;
+  }, [totalTasksCompleted, totalPlannedTasks]);
 
   // あいさつ（今の時刻で判定）
   const greeting = useMemo(() => {
@@ -364,7 +361,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                   <span className="text-blue-100">学習進捗</span>
-                  <span className="text-white">{totalProgress}%</span>
+                  <span className="text-white">{studyProgressText}</span>
                 </div>
                 <Progress value={totalProgress} className="h-2 bg-white/20" />
               </div>
@@ -508,7 +505,7 @@ export default function Dashboard() {
               <BookOpen className="h-4 w-4 text-blue-600" />
             </div>
             <p className="text-xl text-gray-900">
-              {totalTasksCompleted}
+              {totalTasksCompleted}/{totalPlannedTasks}
             </p>
             <p className="mt-0.5 text-xs text-gray-600">
               完了タスク数
@@ -519,9 +516,9 @@ export default function Dashboard() {
               <TrendingUp className="h-4 w-4 text-purple-600" />
             </div>
             <p className="text-xl text-gray-900">
-              {weekStudyHours.toFixed(1)}
+              {totalStudyHoursText}
             </p>
-            <p className="mt-0.5 text-xs text-gray-600">今週時間</p>
+            <p className="mt-0.5 text-xs text-gray-600">総学習時間</p>
           </Card>
         </div>
 
