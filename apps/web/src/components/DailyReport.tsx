@@ -16,6 +16,27 @@ type PlanDay = {
   tasks: string[];
 };
 
+const buildPlanMap = (plan: PlanDay[]) => {
+  const map: Record<string, PlanDay> = {};
+  for (const d of plan) {
+    if (!d?.date) continue;
+    map[d.date] = {
+      date: d.date,
+      theme: typeof d.theme === "string" ? d.theme : "",
+      tasks: Array.isArray(d.tasks)
+        ? d.tasks.filter((t) => typeof t === "string" && t.trim().length > 0)
+        : [],
+    };
+  }
+  return map;
+};
+
+const toDateOnlyString = (value: string) => {
+  const dateObj = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(dateObj.getTime())) return "";
+  return dateObj.toISOString().split("T")[0];
+};
+
 export default function DailyReport() {
   const router = useRouter();
   const todayStr = new Date().toISOString().split("T")[0];
@@ -33,12 +54,15 @@ export default function DailyReport() {
   // 今日の予定表示用（/api/goalsのplanを保持）
   const [planByDate, setPlanByDate] = useState<Record<string, PlanDay>>({});
   const [planError, setPlanError] = useState<string | null>(null);
+  const [postponeError, setPostponeError] = useState<string | null>(null);
+  const [isPostponing, setIsPostponing] = useState(false);
 
   // date が変わったら、その日の plan を引く
   const selectedPlan = useMemo(() => {
     if (!date) return null;
     return planByDate[date] ?? null;
   }, [date, planByDate]);
+  const isRestDay = Boolean(selectedPlan && selectedPlan.tasks.length === 0);
 
   // 初回だけ plan を取得（軽いので毎回じゃなくてOK）
   useEffect(() => {
@@ -67,19 +91,7 @@ export default function DailyReport() {
         const data = await res.json();
         const plan: PlanDay[] = Array.isArray(data.plan) ? data.plan : [];
 
-        const map: Record<string, PlanDay> = {};
-        for (const d of plan) {
-          if (!d?.date) continue;
-          map[d.date] = {
-            date: d.date,
-            theme: typeof d.theme === "string" ? d.theme : "",
-            tasks: Array.isArray(d.tasks)
-              ? d.tasks.filter((t) => typeof t === "string" && t.trim().length > 0)
-              : [],
-          };
-        }
-
-        setPlanByDate(map);
+        setPlanByDate(buildPlanMap(plan));
       } catch (e) {
         console.error("failed to fetch /api/goals", e);
         setPlanByDate({});
@@ -89,6 +101,57 @@ export default function DailyReport() {
 
     fetchGoals();
   }, []);
+
+  const handlePostpone = async () => {
+    if (!date) return;
+    setPostponeError(null);
+    setIsPostponing(true);
+
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch("/api/goals", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders,
+        },
+        body: JSON.stringify({ date }),
+      });
+
+      if (!res.ok) {
+        console.error("failed to postpone plan", await res.text());
+        setPostponeError("予定の後ろ倒しに失敗しました。");
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (Array.isArray(data.plan)) {
+        setPlanByDate(buildPlanMap(data.plan));
+      } else {
+        const targetPlan = planByDate[date];
+        if (!targetPlan?.tasks?.length) return;
+        const nextDate = toDateOnlyString(date);
+        if (!nextDate) return;
+        const nextDay = new Date(`${nextDate}T00:00:00`);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const nextDateStr = nextDay.toISOString().split("T")[0];
+        setPlanByDate((prev) => ({
+          ...prev,
+          [date]: { ...targetPlan, tasks: [] },
+          [nextDateStr]: {
+            date: nextDateStr,
+            theme: prev[nextDateStr]?.theme ?? "",
+            tasks: [...(prev[nextDateStr]?.tasks ?? []), ...targetPlan.tasks],
+          },
+        }));
+      }
+    } catch (e) {
+      console.error("failed to postpone plan", e);
+      setPostponeError("通信エラーが発生しました。もう一度お試しください。");
+    } finally {
+      setIsPostponing(false);
+    }
+  };
 
   const handleSave = async () => {
     setFeedbackError(null);
@@ -188,41 +251,55 @@ export default function DailyReport() {
 
       <div className="space-y-4 p-4">
         {/* 今日（選択日）の予定 */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-900">今日のタスク</p>
-          <p className="text-sm text-blue-600">
-            {selectedPlan?.tasks?.length ? `${selectedPlan.tasks.length}件` : "0件"}
-          </p>
-        </div>
-
-        {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
-
-        {!planError && selectedPlan?.tasks?.length ? (
-          <div className="mt-4 space-y-3">
-            {selectedPlan.tasks.map((t, i) => (
-              <div key={i} className="rounded-lg border border-gray-200 bg-white p-4">
-                <p className="text-sm font-medium text-gray-900">{t}</p>
-
-                <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>30分</span>
-                  </div>
-
-                  {selectedPlan.theme ? (
-                    <span className="text-blue-600">{selectedPlan.theme}</span>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-900">今日のタスク</p>
+              <p className="text-sm text-blue-600">
+                {selectedPlan?.tasks?.length ? `${selectedPlan.tasks.length}件` : "0件"}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handlePostpone}
+              disabled={isPostponing || !selectedPlan?.tasks?.length}
+            >
+              {isPostponing ? "後ろ倒し中…" : "今日は休む"}
+            </Button>
           </div>
-        ) : !planError ? (
-          <p className="mt-3 text-sm text-gray-500">
-            予定なし（計画が未設定か、この日付にタスクがありません）
-          </p>
-        ) : null}
-      </Card>
+
+          {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
+          {postponeError && <p className="mt-2 text-sm text-red-600">{postponeError}</p>}
+
+          {!planError && selectedPlan?.tasks?.length ? (
+            <div className="mt-4 space-y-3">
+              {selectedPlan.tasks.map((t, i) => (
+                <div key={i} className="rounded-lg border border-gray-200 bg-white p-4">
+                  <p className="text-sm font-medium text-gray-900">{t}</p>
+
+                  <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>30分</span>
+                    </div>
+
+                    {selectedPlan.theme ? (
+                      <span className="text-blue-600">{selectedPlan.theme}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !planError ? (
+            <p className="mt-3 text-sm text-gray-500">
+              {isRestDay
+                ? "今日は休みの日です。"
+                : "予定なし（計画が未設定か、この日付にタスクがありません）"}
+            </p>
+          ) : null}
+        </Card>
 
 
         {/* 入力フォーム */}

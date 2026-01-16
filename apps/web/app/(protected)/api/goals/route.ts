@@ -54,6 +54,14 @@ function normalizePlan(plan: unknown) {
   });
 }
 
+function normalizeTaskList(tasks: unknown) {
+  if (!Array.isArray(tasks)) return [];
+  return tasks
+    .filter((task: unknown) => typeof task === "string")
+    .map((task: string) => task.trim().slice(0, MAX_TASK_LENGTH))
+    .filter((task: string) => task.length > 0);
+}
+
 async function deleteUserReports(userId: string, requestId: string) {
   const items: Array<{ userId: string; date: string }> = [];
   let lastKey: Record<string, any> | undefined;
@@ -219,6 +227,110 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     log("error", "goals GET error", { requestId, error: String(e) });
     return NextResponse.json({ error: "failed to load goal", requestId }, { status: 500 });
+  }
+}
+
+// PATCH: 指定日を「休み」にして、タスクを翌日に後ろ倒し
+export async function PATCH(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? randomUUID();
+  try {
+    const auth = await requireAuth(req);
+    if (!auth) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const date = typeof body.date === "string" ? body.date.trim() : "";
+    if (!date) {
+      return NextResponse.json({ error: "date is required", requestId }, { status: 400 });
+    }
+
+    const res = await ddb.send(
+      new GetCommand({
+        TableName: GOALS_TABLE,
+        Key: { userId: auth.userId },
+      }),
+    );
+
+    if (!res.Item) {
+      log("info", "goals patch empty", { requestId, userIdHash: hash8(auth.userId) });
+      return NextResponse.json({ error: "goal not found", requestId }, { status: 404 });
+    }
+
+    const plan = Array.isArray(res.Item.plan) ? res.Item.plan : [];
+    const targetIndex = plan.findIndex((day) => day?.date === date);
+    if (targetIndex === -1) {
+      return NextResponse.json({ error: "plan date not found", requestId }, { status: 404 });
+    }
+
+    const targetDay = plan[targetIndex] ?? {};
+    const targetTasks = normalizeTaskList(targetDay.tasks);
+    if (!targetTasks.length) {
+      return NextResponse.json({ ok: true, plan, requestId });
+    }
+
+    const targetDate = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(targetDate.getTime())) {
+      return NextResponse.json({ error: "invalid date", requestId }, { status: 400 });
+    }
+
+    const nextDate = toDateOnlyString(new Date(targetDate.getTime() + MS_PER_DAY)).slice(
+      0,
+      MAX_DATE_LENGTH,
+    );
+    const nextIndex = plan.findIndex((day) => day?.date === nextDate);
+
+    if (nextIndex === -1) {
+      plan.push({
+        date: nextDate,
+        theme:
+          typeof targetDay.theme === "string"
+            ? targetDay.theme.trim().slice(0, MAX_THEME_LENGTH)
+            : "",
+        tasks: targetTasks,
+      });
+    } else {
+      const nextDay = plan[nextIndex] ?? {};
+      const nextTasks = normalizeTaskList(nextDay.tasks);
+      plan[nextIndex] = {
+        ...nextDay,
+        tasks: [...nextTasks, ...targetTasks],
+      };
+    }
+
+    plan[targetIndex] = {
+      ...targetDay,
+      tasks: [],
+    };
+
+    const sortedPlan = [...plan].sort((a, b) =>
+      String(a?.date ?? "").localeCompare(String(b?.date ?? "")),
+    );
+
+    const updatedItem = {
+      ...res.Item,
+      plan: sortedPlan,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await ddb.send(
+      new PutCommand({
+        TableName: GOALS_TABLE,
+        Item: updatedItem,
+      }),
+    );
+
+    log("info", "goals patch postpone success", {
+      requestId,
+      userIdHash: hash8(auth.userId),
+      date,
+      shiftedTasks: targetTasks.length,
+    });
+
+    return NextResponse.json({ ok: true, plan: sortedPlan, requestId });
+  } catch (e) {
+    log("error", "goals PATCH error", { requestId, error: String(e) });
+    return NextResponse.json({ error: "failed to update goal", requestId }, { status: 500 });
   }
 }
 

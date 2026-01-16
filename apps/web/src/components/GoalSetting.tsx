@@ -105,7 +105,6 @@ function normalizePlanItems(items: ApiPlanItem[]): DayPlan[] {
   today.setHours(0, 0, 0, 0);
   return items
     .map((item, index) => {
-      if (!item.theme) return null;
       const rawTopics = Array.isArray(item.tasks)
         ? item.tasks
         : Array.isArray(item.topics)
@@ -118,8 +117,8 @@ function normalizePlanItems(items: ApiPlanItem[]): DayPlan[] {
       return {
         dayIndex: index + 1,
         date,
-        theme: item.theme,
-        topics: topics.length > 0 ? topics : ['学習内容を追加してください'],
+        theme: typeof item.theme === 'string' ? item.theme : '',
+        topics,
       };
     })
     .filter((item): item is DayPlan => item !== null);
@@ -935,8 +934,18 @@ export default function GoalSetting() {
                         <span className="text-sm text-gray-600">
                           Day {day.dayIndex}
                         </span>
+                        <span className="text-sm text-gray-500">
+                          {formatJP(day.date)}
+                        </span>
+                        {day.topics.length === 0 && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                            休み
+                          </span>
+                        )}
                       </div>
-                      <h3 className="text-gray-900">{day.theme}</h3>
+                      <h3 className="text-gray-900">
+                        {day.topics.length === 0 ? '休み' : day.theme}
+                      </h3>
                     </div>
                     <button
                       type="button"
@@ -981,17 +990,25 @@ export default function GoalSetting() {
                       </Button>
                     </div>
                   ) : (
-                    <ul className="space-y-1">
-                      {day.topics.map((topic, idx) => (
-                        <li
-                          key={idx}
-                          className="flex items-start gap-2 text-sm text-gray-700"
-                        >
-                          <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-600" />
-                          <span>{topic}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      {day.topics.length > 0 ? (
+                        <ul className="space-y-1">
+                          {day.topics.map((topic, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-start gap-2 text-sm text-gray-700"
+                            >
+                              <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-600" />
+                              <span>{topic}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          休みの日として設定されています。
+                        </p>
+                      )}
+                    </>
                   )}
                 </Card>
               ))}
