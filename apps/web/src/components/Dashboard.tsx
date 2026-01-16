@@ -61,6 +61,15 @@ function makeDateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function parseYmd(ymd: string): Date | null {
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [goal, setGoal] = useState<StudyGoal | null>(null);
@@ -281,6 +290,17 @@ export default function Dashboard() {
     }
     return count;
   }, [todayDate, dateHasStudy]);
+
+  const isRestDay = useMemo(() => tasks.length === 0, [tasks]);
+
+  const shouldShowPlanReview = useMemo(() => {
+    if (!latestReport || isRestDay) return false;
+    const lastReportDate = parseYmd(latestReport.date);
+    if (!lastReportDate) return false;
+    const diffMs = todayDate.getTime() - lastReportDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return diffDays >= 3;
+  }, [isRestDay, latestReport, todayDate]);
 
   // 完了タスク数（各日付の最新日報の tasksCompleted 合計）
   const totalTasksCompleted = useMemo(
@@ -532,6 +552,20 @@ export default function Dashboard() {
               <p className="text-sm text-gray-600">
                 記録した日報は、この画面の統計に反映されます。
               </p>
+              {shouldShowPlanReview && (
+                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <p>お忙しいですか？計画を見直して立て直しましょう！</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 w-full border-amber-300 text-amber-900 hover:bg-amber-100"
+                    onClick={() => router.push('/goal')}
+                  >
+                    計画を修正する
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
           <Button
