@@ -242,17 +242,20 @@ export default function GoalSetting() {
       }
     }
 
+    const getAwsSuffixRank = (cert: Certification) => {
+      const source = `${cert.provider}-${cert.code}`.toLowerCase();
+      const match = source.match(/-(f|a|s|p)(?:-|$)/);
+      if (!match) {
+        return awsSuffixOrder.length;
+      }
+      const suffix = `-${match[1]}`;
+      const index = awsSuffixOrder.indexOf(suffix);
+      return index === -1 ? awsSuffixOrder.length : index;
+    };
+
     aws.sort((a, b) => {
-      const aSource = `${a.provider}-${a.code}`.toLowerCase();
-      const bSource = `${b.provider}-${b.code}`.toLowerCase();
-      const aSuffixIndex = awsSuffixOrder.findIndex((suffix) =>
-        aSource.endsWith(suffix),
-      );
-      const bSuffixIndex = awsSuffixOrder.findIndex((suffix) =>
-        bSource.endsWith(suffix),
-      );
-      const aRank = aSuffixIndex === -1 ? awsSuffixOrder.length : aSuffixIndex;
-      const bRank = bSuffixIndex === -1 ? awsSuffixOrder.length : bSuffixIndex;
+      const aRank = getAwsSuffixRank(a);
+      const bRank = getAwsSuffixRank(b);
       if (aRank !== bRank) {
         return aRank - bRank;
       }
