@@ -92,7 +92,7 @@ export default function LandingPage() {
               style={{
                 position: "relative",
                 width: "clamp(280px, 40vw, 360px)",
-                paddingTop: ""75%"",
+                paddingTop: "75%",
                 borderRadius: 16,
                 overflow: "hidden",
                 border: "1px solid #eee",
