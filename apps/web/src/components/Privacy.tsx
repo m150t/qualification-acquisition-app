@@ -88,8 +88,35 @@ export default function Privacy() {
             </div>
           </Section>
 
+          <Section title="10. 広告配信について">
+            本サービスでは、第三者配信の広告サービス（Google AdSense等）を利用する場合があります。
+            <br />
+            広告配信事業者は、ユーザーの興味に応じた広告を表示するために Cookie を使用することがあります。
+            <br />
+            <br />
+            Google を含む第三者配信事業者は、Cookie を使用して、ユーザーが本サービスや他のウェブサイトに過去にアクセスした情報に基づいて広告を配信します。
+            <br />
+            <br />
+            ユーザーは、広告設定によりパーソナライズ広告を無効にすることができます。
+            <br />
+            本サービスでは、Google Analytics 等のアクセス解析ツールを利用する場合があります。
+            <br />
+            これらのツールはトラフィックデータ収集のために Cookie を使用しますが、このデータは匿名で収集され、個人を特定するものではありません。
+          </Section>
+
+          <Section title="11. 運営者情報">
+            <div>運営者名：QUALog 運営</div>
+            <div style={{ marginTop: 6 }}>連絡先：お問い合わせフォーム（URL）</div>
+            <div style={{ marginTop: 6 }}>
+              メールアドレス：
+              <a href="mailto:miho84611@gmail.com" style={{ textDecoration: "underline", marginLeft: 4 }}>
+                miho84611@gmail.com
+              </a>
+            </div>
+          </Section>
+
           <div style={{ marginTop: 28, fontSize: 12, color: "#666" }}>
-            最終更新日：2025-12-26
+            最終更新日：2026-01-17
           </div>
         </div>
       </div>
