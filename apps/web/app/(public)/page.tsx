@@ -91,8 +91,8 @@ export default function LandingPage() {
             <div
               style={{
                 position: "relative",
-                width: "clamp(360px, 60vw, 420px)",
-                paddingTop: "160%",
+                width: "clamp(420px, 70vw, 560px)",
+                paddingTop: "190%",
                 borderRadius: 16,
                 overflow: "hidden",
                 border: "1px solid #eee",
