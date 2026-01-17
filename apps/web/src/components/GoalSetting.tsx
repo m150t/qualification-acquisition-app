@@ -235,7 +235,7 @@ export default function GoalSetting() {
     const awsSuffixOrder = ['-f', '-a', '-s', '-p'];
 
     for (const cert of availableCertifications) {
-      if (cert.provider === 'aws' && cert.code.startsWith('aws')) {
+      if (cert.provider.toLowerCase().startsWith('aws')) {
         aws.push(cert);
       } else {
         others.push(cert);
@@ -243,11 +243,13 @@ export default function GoalSetting() {
     }
 
     aws.sort((a, b) => {
+      const aSource = `${a.provider}-${a.code}`.toLowerCase();
+      const bSource = `${b.provider}-${b.code}`.toLowerCase();
       const aSuffixIndex = awsSuffixOrder.findIndex((suffix) =>
-        a.code.toLowerCase().endsWith(suffix),
+        aSource.endsWith(suffix),
       );
       const bSuffixIndex = awsSuffixOrder.findIndex((suffix) =>
-        b.code.toLowerCase().endsWith(suffix),
+        bSource.endsWith(suffix),
       );
       const aRank = aSuffixIndex === -1 ? awsSuffixOrder.length : aSuffixIndex;
       const bRank = bSuffixIndex === -1 ? awsSuffixOrder.length : bSuffixIndex;
