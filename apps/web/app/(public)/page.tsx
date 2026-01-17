@@ -91,9 +91,8 @@ export default function LandingPage() {
             <div
               style={{
                 position: "relative",
-                width: "100%",
-                maxWidth: 280,
-                paddingTop: "120%",
+                width: "clamp(360px, 60vw, 420px)",
+                paddingTop: "160%",
                 borderRadius: 16,
                 overflow: "hidden",
                 border: "1px solid #eee",
@@ -102,7 +101,7 @@ export default function LandingPage() {
             >
               <iframe
                 title="QUALog ショート動画"
-                src="https://www.youtube.com/embed/YY7D6M6sYS4"
+                src="https://www.youtube.com/embed/YY7D6M6sYS4?rel=0"
                 style={{
                   position: "absolute",
                   inset: 0,
