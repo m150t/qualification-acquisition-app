@@ -82,6 +82,41 @@ export default function LandingPage() {
           <Feature title="記録" desc="進捗が見えるから、続く。" />
         </div>
 
+        <section style={{ marginTop: 48 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, textAlign: "center" }}>1分でわかるショート動画</h2>
+          <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.7, color: "#555", textAlign: "center" }}>
+            縦型のショート動画で、QUALogの雰囲気をざっと掴めます。
+          </p>
+          <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                maxWidth: 280,
+                paddingTop: "120%",
+                borderRadius: 16,
+                overflow: "hidden",
+                border: "1px solid #eee",
+                background: "#000",
+              }}
+            >
+              <iframe
+                title="QUALog ショート動画"
+                src="https://www.youtube.com/embed/YY7D6M6sYS4"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  border: 0,
+                }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </section>
+
         <div
           style={{
             marginTop: 56,
