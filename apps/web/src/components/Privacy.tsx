@@ -106,9 +106,8 @@ export default function Privacy() {
 
           <Section title="11. 運営者情報">
             <div>運営者名：QUALog 運営</div>
-            <div style={{ marginTop: 6 }}>連絡先：お問い合わせフォーム（URL）</div>
             <div style={{ marginTop: 6 }}>
-              メールアドレス：
+              連絡先：
               <a href="mailto:miho84611@gmail.com" style={{ textDecoration: "underline", marginLeft: 4 }}>
                 miho84611@gmail.com
               </a>
@@ -132,4 +131,5 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </section>
   );
 }
+
 
