@@ -76,6 +76,7 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState<UiTask[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [totalPlannedTasks, setTotalPlannedTasks] = useState(0);
+  const [plannedDates, setPlannedDates] = useState<string[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isProcessingResult, setIsProcessingResult] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -134,6 +135,11 @@ export default function Dashboard() {
             0,
           );
           setTotalPlannedTasks(plannedTasksCount);
+          setPlannedDates(
+            data.plan
+              .map((p: DayPlan) => p.date)
+              .filter((date: string) => Boolean(date)),
+          );
 
           // 今日の日付の DayPlan を探して tasks に変換
           const todayPlan: DayPlan | undefined = data.plan.find(
@@ -160,14 +166,17 @@ export default function Dashboard() {
           }
         } else {
           setTotalPlannedTasks(0);
+          setPlannedDates([]);
         }
       } else {
         console.error('failed to load /api/goals', await goalRes.text());
         setTotalPlannedTasks(0);
+        setPlannedDates([]);
       }
     } catch (e) {
       console.error('error fetching /api/goals', e);
       setTotalPlannedTasks(0);
+      setPlannedDates([]);
     }
 
     // 2. 日報一覧
@@ -291,16 +300,25 @@ export default function Dashboard() {
     return count;
   }, [todayDate, dateHasStudy]);
 
-  const isRestDay = useMemo(() => tasks.length === 0, [tasks]);
-
   const shouldShowPlanReview = useMemo(() => {
-    if (!latestReport || isRestDay) return false;
-    const lastReportDate = parseYmd(latestReport.date);
-    if (!lastReportDate) return false;
-    const diffMs = todayDate.getTime() - lastReportDate.getTime();
+    if (!totalPlannedTasks) return false;
+    const lastReportDate = latestReport ? parseYmd(latestReport.date) : null;
+    let baseDate = lastReportDate;
+    if (!baseDate) {
+      const pastPlanDates = plannedDates
+        .map(parseYmd)
+        .filter((date): date is Date => Boolean(date))
+        .filter((date) => date <= todayDate);
+      if (!pastPlanDates.length) return false;
+      baseDate = pastPlanDates.reduce(
+        (earliest, current) => (current < earliest ? current : earliest),
+        pastPlanDates[0],
+      );
+    }
+    const diffMs = todayDate.getTime() - baseDate.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     return diffDays >= 3;
-  }, [isRestDay, latestReport, todayDate]);
+  }, [latestReport, plannedDates, todayDate, totalPlannedTasks]);
 
   // 完了タスク数（各日付の最新日報の tasksCompleted 合計）
   const totalTasksCompleted = useMemo(
