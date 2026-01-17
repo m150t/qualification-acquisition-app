@@ -1,41 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="QUALog ロゴ">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-label="QUALog ロゴ">
   <title>QUALog ロゴ</title>
-  <g fill="none" fill-rule="evenodd">
-    <path
-      fill="#0F2C5C"
-      d="M256 92 100 156l156 64 156-64-156-64Zm-80 96 80 32 80-32v48l-80 32-80-32v-48Zm-40-8v68l120 48 120-48v-68l-40 16v60l-80 32-80-32v-60l-40-16Z"
-    />
-    <path
-      fill="#0F2C5C"
-      d="M124 230c0 26 18 46 40 46v-16c-14 0-24-12-24-30v-28c0-10 8-18 18-18h10v-16h-10c-19 0-34 15-34 34v28Z"
-    />
-    <path
-      fill="#0F2C5C"
-      d="M130 264h20v64h-20z"
-    />
-    <path
-      fill="#0F2C5C"
-      d="M156 336c0 18-14 32-32 32s-32-14-32-32h20c0 7 5 12 12 12s12-5 12-12h20Z"
-    />
-    <path
-      fill="#0F2C5C"
-      d="M122 400h268v36H122z"
-    />
-    <path
-      fill="#0F2C5C"
-      d="M118 356h276v28H118z"
-    />
-    <text
-      x="256"
-      y="362"
-      text-anchor="middle"
-      font-family="Segoe UI, Arial, sans-serif"
-      font-size="64"
-      font-weight="800"
-      letter-spacing="2"
-      fill="#0F2C5C"
-    >
-      QUALOG
-    </text>
+  <rect width="640" height="640" fill="#FFFFFF" />
+  <g fill="#1A2A4A">
+    <path d="M320 156 138 230l182 74 182-74-182-74Zm-92 120 92 36 92-36v58l-92 36-92-36v-58Z" />
+    <path d="M184 256v72l136 54 136-54v-72l-44 18v56l-92 36-92-36v-56l-44-18Z" />
+    <path d="M210 282h16v72h-16z" />
+    <path d="M210 278c0 10-8 18-18 18v-12c4 0 8-4 8-8v-18c0-8 6-14 14-14h14v-12h-14c-14 0-24 10-24 24v22Z" />
+    <circle cx="320" cy="206" r="10" fill="#FFFFFF" />
   </g>
+  <text
+    x="320"
+    y="430"
+    text-anchor="middle"
+    font-family="Segoe UI, Arial, sans-serif"
+    font-size="72"
+    font-weight="800"
+    letter-spacing="3"
+    fill="#1A2A4A"
+  >
+    QUALOG
+  </text>
 </svg>
