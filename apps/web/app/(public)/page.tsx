@@ -23,7 +23,7 @@ export default function LandingPage() {
           </h1>
         </div>
 
-        <p style={{ marginTop: 16, fontSize: 18, lineHeight: 1.7, textAlign: "center" }}>
+        <p style={{ marginTop: 16, fontSize: 17, lineHeight: 1.7, textAlign: "center" }}>
           資格学習の計画を立てて、毎日の進捗を記録。
           <br />
           「続く仕組み」を最短で作る学習ダッシュボード。
@@ -91,8 +91,8 @@ export default function LandingPage() {
             <div
               style={{
                 position: "relative",
-                width: "clamp(420px, 70vw, 560px)",
-                paddingTop: "190%",
+                width: "clamp(280px, 40vw, 360px)",
+                paddingTop: ""75%"",
                 borderRadius: 16,
                 overflow: "hidden",
                 border: "1px solid #eee",
