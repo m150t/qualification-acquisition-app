@@ -116,6 +116,30 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section style={{ marginTop: 56 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, textAlign: "center" }}>学習コラム</h2>
+          <p style={{ marginTop: 10, fontSize: 15, lineHeight: 1.8, color: "#555", textAlign: "center" }}>
+            学習を続けるコツや、つまずいたときの戻り方をまとめています。
+          </p>
+          <div style={{ marginTop: 20, display: "flex", justifyContent: "center" }}>
+            <Link
+              href="/learning-tips/restart-study"
+              style={{
+                display: "inline-block",
+                padding: "12px 18px",
+                borderRadius: 10,
+                border: "1px solid #111",
+                background: "#fff",
+                color: "#111",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              1日サボっても、学習をやめないために
+            </Link>
+          </div>
+        </section>
+
         <div
           style={{
             marginTop: 56,
