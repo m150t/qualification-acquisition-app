@@ -4,22 +4,45 @@ export default function LandingPage() {
   return (
     <main style={{ minHeight: "100vh", padding: "64px 24px" }}>
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em" }}>
-          QUALog -試験対策の設計支援と伴走
-        </h1>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+            gap: 18,
+          }}
+        >
+          <img
+            src="/qualog-logo.svg"
+            alt="QUALog ロゴ"
+            style={{ width: 140, height: "auto" }}
+          />
+          <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            QUALog -試験対策の設計支援と伴走
+          </h1>
+        </div>
 
-        <p style={{ marginTop: 16, fontSize: 18, lineHeight: 1.7 }}>
+        <p style={{ marginTop: 16, fontSize: 18, lineHeight: 1.7, textAlign: "center" }}>
           資格学習の計画を立てて、毎日の進捗を記録。
           <br />
           「続く仕組み」を最短で作る学習ダッシュボード。
         </p>
 
-        <p style={{ marginTop: 24, fontSize: 14, color: "#555" }}>
+        <p style={{ marginTop: 24, fontSize: 14, color: "#555", textAlign: "center" }}>
            🔧 最近のアップデート：
             計画変更機能を追加しました（2026/1）
         </p>
 
-        <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginTop: 28,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
           <Link
             href="/app"
             style={{
@@ -67,6 +90,7 @@ export default function LandingPage() {
             display: "flex",
             gap: 16,
             flexWrap: "wrap",
+            justifyContent: "center",
           }}
         >
           <span>※ 現在ベータ版として公開中です。</span>

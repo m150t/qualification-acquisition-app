@@ -229,6 +229,42 @@ export default function GoalSetting() {
     return [...baseList, otherOption];
   }, [certifications]);
 
+  const groupedCertifications = useMemo(() => {
+    const aws: Certification[] = [];
+    const others: Certification[] = [];
+    const awsSuffixOrder = ['-f', '-a', '-s', '-p'];
+
+    for (const cert of availableCertifications) {
+      if (cert.provider.toLowerCase().startsWith('aws')) {
+        aws.push(cert);
+      } else {
+        others.push(cert);
+      }
+    }
+
+    const getAwsSuffixRank = (cert: Certification) => {
+      const source = `${cert.provider}-${cert.code}`.toLowerCase();
+      const match = source.match(/-(f|a|s|p)(?:-|$)/);
+      if (!match) {
+        return awsSuffixOrder.length;
+      }
+      const suffix = `-${match[1]}`;
+      const index = awsSuffixOrder.indexOf(suffix);
+      return index === -1 ? awsSuffixOrder.length : index;
+    };
+
+    aws.sort((a, b) => {
+      const aRank = getAwsSuffixRank(a);
+      const bRank = getAwsSuffixRank(b);
+      if (aRank !== bRank) {
+        return aRank - bRank;
+      }
+      return a.name.localeCompare(b.name, 'ja');
+    });
+
+    return { aws, others };
+  }, [availableCertifications]);
+
   // 選択中資格
   const selectedCert =
     availableCertifications.find((c) => c.code === selectedCertCode) ??
@@ -699,11 +735,24 @@ export default function GoalSetting() {
                     資格一覧を読み込み中…
                   </option>
                 )}
-                {availableCertifications.map((cert) => (
-                  <option key={cert.code} value={cert.code}>
-                    {cert.name}
-                  </option>
-                ))}
+                {groupedCertifications.aws.length > 0 && (
+                  <optgroup label="AWS資格">
+                    {groupedCertifications.aws.map((cert) => (
+                      <option key={cert.code} value={cert.code}>
+                        {cert.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {groupedCertifications.others.length > 0 && (
+                  <optgroup label="その他資格">
+                    {groupedCertifications.others.map((cert) => (
+                      <option key={cert.code} value={cert.code}>
+                        {cert.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 
