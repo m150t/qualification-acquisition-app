@@ -61,11 +61,11 @@ export default function Privacy() {
           </Section>
 
           <Section title="4. 第三者提供">
-            法令に基づく場合を除き、利用者の同意なく個人情報を第三者に提供することはありません。
+            <li>法令に基づく場合を除き、利用者の同意なく個人情報を第三者に提供することはありません。</li>
           </Section>
 
           <Section title="5. 情報の管理">
-            取得した情報は、不正アクセス・漏えい・改ざん等を防止するため、適切な安全管理措置を講じて管理します。
+            <li>取得した情報は、不正アクセス・漏えい・改ざん等を防止するため、適切な安全管理措置を講じて管理します。</li>
           </Section>
 
           <Section title="6. 退会およびデータ削除">
@@ -83,11 +83,11 @@ export default function Privacy() {
           </Section>
 
           <Section title="8. プライバシーポリシーの変更">
-            本ポリシーの内容は、必要に応じて変更することがあります。変更後の内容は、本サービス上に掲載した時点で効力を生じます。
+            <li>本ポリシーの内容は、必要に応じて変更することがあります。変更後の内容は、本サービス上に掲載した時点で効力を生じます。</li>
           </Section>
 
           <Section title="9. お問い合わせ">
-            本ポリシーに関するお問い合わせは、以下の問い合わせフォームよりご連絡ください。
+            <li>本ポリシーに関するお問い合わせは、以下の問い合わせフォームよりご連絡ください。</li>
             <div style={{ marginTop: 8 }}>
               <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
                 {CONTACT_URL}
@@ -141,5 +141,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </section>
   );
 }
+
 
 
