@@ -63,9 +63,6 @@ export default function RestartStudyPage() {
             結果として「今日はやらなくていいや」が何日も続いてしまう。
           </p>
         </section>
-
-        <AdPlaceholder label="広告" note="学習の合間に、休み明けの取り組み方をサポートする教材紹介など" />
-
         <section style={{ marginTop: 32 }}>
           <h2 style={{ fontSize: 22, fontWeight: 900 }}>「戻れる前提」で学習を設計する</h2>
           <p style={{ marginTop: 12, lineHeight: 1.9, color: "#333" }}>
@@ -100,30 +97,6 @@ export default function RestartStudyPage() {
             もし今「1日空いてしまって気まずい」と感じているなら、それはやめる理由ではなく、再開するタイミングかもしれない。
           </p>
         </section>
-
-        <AdPlaceholder label="広告" note="学習を再開するときに役立つ計画テンプレートやガイド" />
-
-        <section style={{ marginTop: 40 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 900 }}>内部リンク</h2>
-          <ul style={{ marginTop: 12, paddingLeft: 18, lineHeight: 1.9, color: "#333" }}>
-            <li>
-              <Link href="/" style={{ color: "#111", textDecoration: "underline" }}>
-                LP（QUALogトップ）
-              </Link>
-            </li>
-            <li>
-              <Link href="/howto" style={{ color: "#111", textDecoration: "underline" }}>
-                使い方（How to）
-              </Link>
-            </li>
-            <li>
-              <Link href="/app" style={{ color: "#111", textDecoration: "underline" }}>
-                QUALog紹介（ダッシュボード）
-              </Link>
-            </li>
-          </ul>
-        </section>
-
         <Footer />
       </div>
     </main>
