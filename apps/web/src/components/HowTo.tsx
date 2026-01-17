@@ -52,6 +52,39 @@ export default function HowTo() {
           </Link>
         </div>
 
+        <section style={{ marginTop: 36 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 900 }}>操作説明動画</h2>
+          <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.8, color: "#444" }}>
+            3分でざっと流れを掴める動画です。先に見ておくと設定がスムーズです。
+          </p>
+          <div
+            style={{
+              marginTop: 16,
+              position: "relative",
+              width: "100%",
+              paddingTop: "56.25%",
+              borderRadius: 16,
+              overflow: "hidden",
+              border: "1px solid #eee",
+              background: "#000",
+            }}
+          >
+            <iframe
+              title="QUALog 操作説明動画"
+              src="https://www.youtube.com/embed/3u2v8XkViHw"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                border: 0,
+              }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </section>
+
         <section style={{ marginTop: 40, display: "grid", gap: 16 }}>
           <Card
             step="STEP 1"
