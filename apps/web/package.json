@@ -32,10 +32,7 @@
     "@study/shared": "file:../../packages/shared",
     "class-variance-authority": "^0.7.1",
     "embla-carousel-react": "^8.6.0",
-<<<<<<< HEAD
-=======
     "lucide-react": "^0.562.0",
->>>>>>> f7b1c29 (Fix deps for webtmp build)
     "next": "16.0.10",
     "openai": "^6.9.1",
     "react": "19.2.0",
