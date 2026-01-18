@@ -4,6 +4,7 @@ const nextConfig = {
   experimental: {
     // CSS 最適化で lightningcss を使うのをやめる
     optimizeCss: false,
+    turbo: false,
   },
 
 };
