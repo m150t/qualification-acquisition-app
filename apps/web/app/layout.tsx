@@ -27,6 +27,9 @@ export const metadata: Metadata = {
     description: "学習計画が崩れても、戻れる。資格学習の継続を支えるアプリ。",
     images: ["https://qua-log.com/ogp.png"],
   },
+  other: {
+    "google-adsense-account": "ca-pub-3961829109868432",
+  },
 };
 
 const GA_ID = "G-REKGLY7BW6";
