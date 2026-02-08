@@ -69,7 +69,7 @@ export async function generatePlan(params: {
 
   try {
     const completion = await withTimeout(
-      () =>
+      (signal) =>
         client.chat.completions.create({
           model: OPENAI_MODEL,
           messages: [
@@ -110,7 +110,7 @@ export async function generatePlan(params: {
             },
           },
           max_tokens: OPENAI_MAX_TOKENS,
-        }),
+        }, { signal }),
       timeoutMs,
     );
 
