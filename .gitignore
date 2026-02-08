@@ -1,5 +1,15 @@
+# Next.js
+.next/
+node_modules/
+
 # amplify
-node_modules
 .amplify
 amplify_outputs*
 amplifyconfiguration*
+.aws-exports*
+.aws/
+
+# env
+.env
+.env.local
+

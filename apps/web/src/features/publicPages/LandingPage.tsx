@@ -1,0 +1,150 @@
+import Link from "next/link";
+
+export default function LandingPage() {
+  return (
+    <>
+      <div
+        style={{
+          marginTop: 18,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+          gap: 18,
+        }}
+      >
+        <img src="/qualog-logo.svg" alt="QUALog ロゴ" style={{ width: 140, height: "auto" }} />
+        <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          QUALog -試験対策の設計支援と伴走
+        </h1>
+      </div>
+
+      <p style={{ marginTop: 16, fontSize: 17, lineHeight: 1.7, textAlign: "center" }}>
+        資格学習の計画を立てて、毎日の進捗を記録。
+        <br />
+        「続く仕組み」を最短で作る学習ダッシュボード。
+      </p>
+
+      <p style={{ marginTop: 24, fontSize: 14, color: "#555", textAlign: "center" }}>
+        🔧 最近のアップデート：計画変更機能を追加しました（2026/1）
+      </p>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginTop: 28,
+          flexWrap: "wrap",
+          justifyContent: "center",
+        }}
+      >
+        <Link
+          href="/login"
+          style={{
+            display: "inline-block",
+            padding: "12px 18px",
+            borderRadius: 10,
+            border: "1px solid #111",
+            background: "#111",
+            color: "#fff",
+            textDecoration: "none",
+            fontWeight: 700,
+          }}
+        >
+          無料で始める
+        </Link>
+
+        <Link
+          href="/login"
+          style={{
+            display: "inline-block",
+            padding: "12px 18px",
+            borderRadius: 10,
+            border: "1px solid #aaa",
+            background: "#fff",
+            color: "#111",
+            textDecoration: "none",
+            fontWeight: 700,
+          }}
+        >
+          ログイン
+        </Link>
+      </div>
+
+      <div style={{ marginTop: 48, display: "grid", gap: 16 }}>
+        <Feature title="計画" desc="資格・期限から、学習の全体像を作る。" />
+        <Feature title="実行" desc="今日やることを迷わない。" />
+        <Feature title="記録" desc="進捗が見えるから、続く。" />
+      </div>
+
+      <section style={{ marginTop: 48 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, textAlign: "center" }}>1分でわかるショート動画</h2>
+        <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.7, color: "#555", textAlign: "center" }}>
+          縦型のショート動画で、QUALogの雰囲気をざっと掴めます。
+        </p>
+        <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+          <div
+            style={{
+              position: "relative",
+              width: "clamp(280px, 40vw, 360px)",
+              paddingTop: "75%",
+              borderRadius: 16,
+              overflow: "hidden",
+              border: "1px solid #eee",
+              background: "#000",
+            }}
+          >
+            <iframe
+              title="QUALog ショート動画"
+              src="https://www.youtube.com/embed/YY7D6M6sYS4?rel=0"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                border: 0,
+              }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      </section>
+
+      <section style={{ marginTop: 56 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, textAlign: "center" }}>学習コラム</h2>
+        <p style={{ marginTop: 10, fontSize: 15, lineHeight: 1.8, color: "#555", textAlign: "center" }}>
+          学習を続けるコツや、つまずいたときの戻り方をまとめています。
+        </p>
+        <div style={{ marginTop: 20, display: "flex", justifyContent: "center" }}>
+          <Link
+            href="/learning-tips/restart-study"
+            style={{
+              display: "inline-block",
+              padding: "12px 18px",
+              borderRadius: 10,
+              border: "1px solid #111",
+              background: "#fff",
+              color: "#111",
+              textDecoration: "none",
+              fontWeight: 700,
+            }}
+          >
+            1日サボっても、学習をやめないために
+          </Link>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function Feature({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div style={{ padding: 18, border: "1px solid #eee", borderRadius: 14 }}>
+      <div style={{ fontWeight: 800 }}>{title}</div>
+      <div style={{ marginTop: 8, color: "#444", lineHeight: 1.6 }}>
+        {desc}
+      </div>
+    </div>
+  );
+}

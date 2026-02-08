@@ -2,7 +2,7 @@
   "name": "webtmp",
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -30,6 +30,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@study/sdk": "file:../../packages/sdk",
     "@study/shared": "file:../../packages/shared",
+    "aws-amplify": "^6.15.10",
     "class-variance-authority": "^0.7.1",
     "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.562.0",

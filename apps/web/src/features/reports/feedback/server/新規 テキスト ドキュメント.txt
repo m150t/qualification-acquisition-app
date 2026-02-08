@@ -1,0 +1,15 @@
+// ==================================================
+// Feedback 入力/内部型
+// ==================================================
+export type FeedbackRequest = {
+  date: string;         // YYYY-MM-DD
+  content: string;      // 日報本文
+  studyTime?: number | string | null;
+  tasksCompleted?: number | string | null;
+};
+
+export type PlanDay = {
+  date: string;
+  theme?: string;
+  tasks?: string[];
+};
