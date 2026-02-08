@@ -3,8 +3,8 @@
 // ==================================================
 import { hash8, log } from "@/lib/logger";
 import { getClientIp, rateLimit } from "@/lib/rateLimit";
-import { createOpenAiClient } from "@/lib/openai/client";
-import { withTimeout, isAbortError } from "@/lib/openai/timeout";
+import { createOpenAiClient } from "@/lib/ai/client";
+import { withTimeout, isAbortError } from "@/lib/ai/timeout";
 import { ServiceError } from "@/lib/apiRouteHelpers";
 import { findPlanDay } from "./goalPlanRepo";
 import { buildFeedbackSystemPrompt, buildFeedbackUserPrompt } from "./prompt";
