@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/src/lib/authServer";
-import { isServiceError, requestIdOf } from "@/src/lib/apiRouteHelpers";
-import { deleteAccount } from "@/src/features/account/server/service";
+import { requireAuth } from "@/lib/authServer";
+import { isServiceError, requestIdOf } from "@/lib/apiRouteHelpers";
+import { deleteAccount } from "@/features/account/server/service";
 
 export async function DELETE(req: NextRequest) {
   const requestId = requestIdOf(req);

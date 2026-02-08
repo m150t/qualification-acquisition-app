@@ -7,9 +7,9 @@
 // ==================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/src/lib/authServer";
-import { isServiceError, requestIdOf } from "@/src/lib/apiRouteHelpers";
-import { generatePlan } from "@/src/features/goal/plan/server/generatePlan";
+import { requireAuth } from "@/lib/authServer";
+import { isServiceError, requestIdOf } from "@/lib/apiRouteHelpers";
+import { generatePlan } from "@/features/goal/plan/server/generatePlan";
 
 export async function POST(req: NextRequest) {
   const requestId = requestIdOf(req);

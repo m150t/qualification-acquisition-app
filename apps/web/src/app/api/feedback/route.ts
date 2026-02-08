@@ -2,9 +2,9 @@
 // HTTP層：認証して、reports/feedback の service を呼ぶ
 // ==================================================
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/src/lib/authServer";
-import { requestIdOf, isServiceError } from "@/src/lib/apiRouteHelpers";
-import { generateFeedback } from "@/src/features/reports/feedback/server/service";
+import { requireAuth } from "@/lib/authServer";
+import { requestIdOf, isServiceError } from "@/lib/apiRouteHelpers";
+import { generateFeedback } from "@/features/reports/feedback/server/service";
 
 export async function POST(req: NextRequest) {
   const requestId = requestIdOf(req);
