@@ -2,7 +2,7 @@
 // Certifications service (usecase)
 // ==================================================
 
-import { hash8, log } from "@/src/lib/logger";
+import { hash8, log } from "@/lib/logger";
 import { scanAllCertifications } from "./repo";
 import { toCertificationListItem } from "./mapper";
 import type { ServiceError } from "./types";

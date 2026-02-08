@@ -2,8 +2,8 @@
 // Goals(plan) から当日分だけ引く（Feedback専用の読み取りRepo）
 // ==================================================
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
-import { ddb } from "@/src/lib/dynamodb";
-import { hash8, log } from "@/src/lib/logger";
+import { ddb } from "@/lib/dynamodb";
+import { hash8, log } from "@/lib/logger";
 import { PlanDay } from "./types";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";

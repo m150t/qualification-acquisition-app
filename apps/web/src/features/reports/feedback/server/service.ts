@@ -1,11 +1,11 @@
 // ==================================================
 // Reports/Feedback のユースケース層（service）
 // ==================================================
-import { hash8, log } from "@/src/lib/logger";
-import { getClientIp, rateLimit } from "@/src/lib/rateLimit";
-import { createOpenAiClient } from "@/src/lib/openai/client";
-import { withTimeout, isAbortError } from "@/src/lib/openai/timeout";
-import { ServiceError } from "@/src/lib/apiRouteHelpers";
+import { hash8, log } from "@/lib/logger";
+import { getClientIp, rateLimit } from "@/lib/rateLimit";
+import { createOpenAiClient } from "@/lib/openai/client";
+import { withTimeout, isAbortError } from "@/lib/openai/timeout";
+import { ServiceError } from "@/lib/apiRouteHelpers";
 import { findPlanDay } from "./goalPlanRepo";
 import { buildFeedbackSystemPrompt, buildFeedbackUserPrompt } from "./prompt";
 import { FeedbackRequest } from "./types";

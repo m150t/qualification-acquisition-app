@@ -2,7 +2,7 @@
 // Certifications テーブルから「試験ガイド」を取る
 // ==================================================
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
-import { ddb } from "@/src/lib/dynamodb";
+import { ddb } from "@/lib/dynamodb";
 import type { ExamGuide } from "./types";
 
 const CERTIFICATIONS_TABLE = process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";

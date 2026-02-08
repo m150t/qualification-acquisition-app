@@ -1,5 +1,5 @@
 import { BatchWriteCommand, DeleteCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { ddb } from "@/src/lib/dynamodb";
+import { ddb } from "@/lib/dynamodb";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";

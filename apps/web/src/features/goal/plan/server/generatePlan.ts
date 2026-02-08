@@ -2,14 +2,14 @@
 // 生成AIで学習計画を作る（plan APIのコア / usecase）
 // ==================================================
 
-import { hash8, log } from "@/src/lib/logger";
+import { hash8, log } from "@/lib/logger";
 import type { PlanDay } from "./types";
 import { getExamGuideByCode } from "./examGuideRepo";
 import { buildPlanPrompt } from "./prompt";
 import { parsePlanFromText } from "./parser";
 import { validateGeneratePlanRequest } from "./validators";
-import { getOpenAiClient } from "@/src/lib/ai/openaiClient";
-import { withTimeout } from "@/src/lib/ai/timeout";
+import { getOpenAiClient } from "@/lib/ai/openaiClient";
+import { withTimeout } from "@/lib/ai/timeout";
 
 const OPENAI_MODEL = "gpt-4.1-mini";
 const OPENAI_MAX_TOKENS = 1200;

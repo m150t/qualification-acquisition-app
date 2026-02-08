@@ -1,4 +1,4 @@
-import { hash8, log } from "@/src/lib/logger";
+import { hash8, log } from "@/lib/logger";
 import { deleteGoalByUserId } from "./repo";
 import { deleteAllReportsByUserId } from "./repo";
 import { deleteAllCustomCertificationsByUserId } from "./repo";
