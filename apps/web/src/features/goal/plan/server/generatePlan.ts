@@ -8,7 +8,7 @@ import { getExamGuideByCode } from "./examGuideRepo";
 import { buildPlanPrompt } from "./prompt";
 import { parsePlanFromText } from "./parser";
 import { validateGeneratePlanRequest } from "./validators";
-import { getOpenAiClient } from "@/lib/ai/openaiClient";
+import { createOpenAiClient } from "@/lib/ai/client";
 import { withTimeout } from "@/lib/ai/timeout";
 
 const OPENAI_MODEL = "gpt-4.1-mini";
@@ -54,7 +54,7 @@ export async function generatePlan(params: {
   if (!built) return { status: 400, error: "goal.examDate の形式が不正です" };
 
   // 3) OpenAI client（Secrets必須。env直参照禁止）
-  const client = await getOpenAiClient().catch((e) => {
+  const client = await createOpenAiClient().catch((e) => {
     log("error", "plan openai client init failed", {
       requestId,
       userIdHash: hash8(userId),
@@ -69,48 +69,16 @@ export async function generatePlan(params: {
 
   try {
     const completion = await withTimeout(
-      () =>
+      (signal) =>
         client.chat.completions.create({
           model: OPENAI_MODEL,
           messages: [
-            {
-              role: "system",
-              content:
-                "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を日本語の JSON で返してください。",
-            },
-            { role: "user", content: built.prompt },
+            { role: "system", content: built.messages.system },
+            { role: "user", content: built.messages.user },
           ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "study_plan",
-              schema: {
-                type: "object",
-                additionalProperties: false,
-                required: ["plan"],
-                properties: {
-                  plan: {
-                    type: "array",
-                    minItems: built.window.totalDays,
-                    maxItems: built.window.totalDays,
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      required: ["date", "theme", "tasks"],
-                      properties: {
-                        date: { type: "string" },
-                        theme: { type: "string" },
-                        tasks: { type: "array", items: { type: "string" }, maxItems: 3 },
-                      },
-                    },
-                  },
-                },
-              },
-              strict: true,
-            },
-          },
+          response_format: built.responseFormat,
           max_tokens: OPENAI_MAX_TOKENS,
-        }),
+        }, { signal }),
       timeoutMs,
     );
 
