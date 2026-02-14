@@ -2,13 +2,47 @@
 // Reports/Feedback のユースケース層（service）
 // ==================================================
 import { hash8, log } from "@/lib/logger";
-import { getClientIp, rateLimit } from "@/lib/rateLimit";
 import { createOpenAiClient } from "@/lib/ai/client";
 import { withTimeout, isAbortError } from "@/lib/ai/timeout";
 import { ServiceError } from "@/lib/apiRouteHelpers";
 import { findPlanDay } from "./goalPlanRepo";
 import { buildFeedbackSystemPrompt, buildFeedbackUserPrompt } from "./prompt";
-import { FeedbackRequest } from "./types";
+
+type FeedbackRequest = {
+  date: string;
+  content: string;
+  studyTime?: number | string | null;
+  tasksCompleted?: number | string | null;
+};
+
+const feedbackRateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function getClientIp(headers: Headers): string {
+  const xff = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const rip = headers.get("x-real-ip")?.trim();
+  return xff || rip || "unknown";
+}
+
+function rateLimit(key: string, options: { limit: number; windowMs: number }) {
+  const now = Date.now();
+  const prev = feedbackRateLimitStore.get(key);
+
+  if (!prev || now >= prev.resetAt) {
+    const next = { count: 1, resetAt: now + options.windowMs };
+    feedbackRateLimitStore.set(key, next);
+    return { ok: true as const, remaining: Math.max(0, options.limit - 1), resetAt: next.resetAt };
+  }
+
+  const count = prev.count + 1;
+  const next = { count, resetAt: prev.resetAt };
+  feedbackRateLimitStore.set(key, next);
+
+  return {
+    ok: count <= options.limit,
+    remaining: Math.max(0, options.limit - count),
+    resetAt: next.resetAt,
+  };
+}
 
 const MODEL = "gpt-4.1-mini";
 const MAX_CONTENT_LENGTH = 4000;
