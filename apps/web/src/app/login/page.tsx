@@ -133,7 +133,7 @@ export default function LoginPage() {
   }}
 >
   <Authenticator>
-    {({ signOut }) => (
+    {({ signOut }: { signOut?: () => void }) => (
       <div style={{ padding: 16 }}>
         <div style={{ fontWeight: 800, fontSize: 16 }}>ログイン済みです</div>
         <div style={{ marginTop: 8, color: "#475569", fontSize: 14 }}>
@@ -154,7 +154,7 @@ export default function LoginPage() {
             ダッシュボードへ
           </button>
           <button
-            onClick={signOut}
+            onClick={() => signOut?.()}
             style={{
               fontSize: 12,
               padding: "8px 12px",

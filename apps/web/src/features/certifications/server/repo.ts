@@ -35,3 +35,6 @@ export async function listCertifications(): Promise<CertificationDto[]> {
   items.sort((a, b) => a.name.localeCompare(b.name, "ja"));
   return items;
 }
+
+// Backward-compatible alias for existing service import
+export const scanAllCertifications = listCertifications;

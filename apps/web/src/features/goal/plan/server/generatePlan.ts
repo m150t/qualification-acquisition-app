@@ -73,42 +73,10 @@ export async function generatePlan(params: {
         client.chat.completions.create({
           model: OPENAI_MODEL,
           messages: [
-            {
-              role: "system",
-              content:
-                "あなたは資格学習のコーチです。ユーザーの試験日から逆算して、現実的な日次学習計画を日本語の JSON で返してください。",
-            },
-            { role: "user", content: built.prompt },
+            { role: "system", content: built.messages.system },
+            { role: "user", content: built.messages.user },
           ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "study_plan",
-              schema: {
-                type: "object",
-                additionalProperties: false,
-                required: ["plan"],
-                properties: {
-                  plan: {
-                    type: "array",
-                    minItems: built.window.totalDays,
-                    maxItems: built.window.totalDays,
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      required: ["date", "theme", "tasks"],
-                      properties: {
-                        date: { type: "string" },
-                        theme: { type: "string" },
-                        tasks: { type: "array", items: { type: "string" }, maxItems: 3 },
-                      },
-                    },
-                  },
-                },
-              },
-              strict: true,
-            },
-          },
+          response_format: built.responseFormat,
           max_tokens: OPENAI_MAX_TOKENS,
         }, { signal }),
       timeoutMs,
