@@ -1,7 +1,11 @@
 // ==================================================
 // Feedback 用プロンプト生成
 // ==================================================
-import { PlanDay } from "./types";
+type PlanDay = {
+  date: string;
+  theme?: string;
+  tasks: string[];
+};
 
 export function buildFeedbackSystemPrompt() {
   return [

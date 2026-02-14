@@ -8,7 +8,7 @@ import { getExamGuideByCode } from "./examGuideRepo";
 import { buildPlanPrompt } from "./prompt";
 import { parsePlanFromText } from "./parser";
 import { validateGeneratePlanRequest } from "./validators";
-import { getOpenAiClient } from "@/lib/ai/openaiClient";
+import { createOpenAiClient } from "@/lib/ai/client";
 import { withTimeout } from "@/lib/ai/timeout";
 
 const OPENAI_MODEL = "gpt-4.1-mini";
@@ -54,7 +54,7 @@ export async function generatePlan(params: {
   if (!built) return { status: 400, error: "goal.examDate の形式が不正です" };
 
   // 3) OpenAI client（Secrets必須。env直参照禁止）
-  const client = await getOpenAiClient().catch((e) => {
+  const client = await createOpenAiClient().catch((e) => {
     log("error", "plan openai client init failed", {
       requestId,
       userIdHash: hash8(userId),
@@ -69,7 +69,7 @@ export async function generatePlan(params: {
 
   try {
     const completion = await withTimeout(
-      () =>
+      (signal) =>
         client.chat.completions.create({
           model: OPENAI_MODEL,
           messages: [
@@ -110,7 +110,7 @@ export async function generatePlan(params: {
             },
           },
           max_tokens: OPENAI_MAX_TOKENS,
-        }),
+        }, { signal }),
       timeoutMs,
     );
 

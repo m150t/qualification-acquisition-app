@@ -1,7 +1,7 @@
 import { hash8, log } from "@/lib/logger";
-import { deleteGoalByUserId } from "./repo";
-import { deleteAllReportsByUserId } from "./repo";
-import { deleteAllCustomCertificationsByUserId } from "./repo";
+import { deleteGoalByUserId } from "./customCertRepo";
+import { deleteAllReportsByUserId } from "./customCertRepo";
+import { deleteAllCustomCertificationsByUserId } from "./customCertRepo";
 
 export type ServiceError = { status: number; error: string };
 
