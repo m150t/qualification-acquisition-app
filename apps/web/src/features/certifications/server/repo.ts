@@ -17,8 +17,15 @@ export async function listCertifications(): Promise<CertificationDto[]> {
       new ScanCommand({
         TableName: CERTIFICATIONS_TABLE,
         ExclusiveStartKey: lastEvaluatedKey,
-        ProjectionExpression: "#c, #n",
-        ExpressionAttributeNames: { "#c": "code", "#n": "name" },
+        ProjectionExpression: "#c, #n, #p, #dwh, #dw, #eg",
+        ExpressionAttributeNames: {
+          "#c": "code",
+          "#n": "name",
+          "#p": "provider",
+          "#dwh": "defaultWeeklyHours",
+          "#dw": "defaultWeeks",
+          "#eg": "examGuide",
+        },
       }),
     );
 
@@ -26,7 +33,13 @@ export async function listCertifications(): Promise<CertificationDto[]> {
       const code = (it as any)?.code;
       const name = (it as any)?.name;
       if (typeof code === "string" && typeof name === "string") {
-        items.push({ code, name });
+        const provider = typeof (it as any)?.provider === "string" ? (it as any).provider : undefined;
+        const defaultWeeklyHours =
+          typeof (it as any)?.defaultWeeklyHours === "number" ? (it as any).defaultWeeklyHours : undefined;
+        const defaultWeeks = typeof (it as any)?.defaultWeeks === "number" ? (it as any).defaultWeeks : undefined;
+        const examGuide = (it as any)?.examGuide;
+
+        items.push({ code, name, provider, defaultWeeklyHours, defaultWeeks, examGuide });
       }
     }
     lastEvaluatedKey = res.LastEvaluatedKey as any;
