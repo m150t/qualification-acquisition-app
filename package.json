@@ -2,8 +2,7 @@
   "name": "studycoach",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/*"
   ],
   "scripts": {
     "build:web": "npm --workspace apps/web run build",

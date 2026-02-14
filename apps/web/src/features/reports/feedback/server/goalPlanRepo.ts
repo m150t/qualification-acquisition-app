@@ -4,7 +4,12 @@
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/lib/dynamodb";
 import { hash8, log } from "@/lib/logger";
-import { PlanDay } from "./types";
+
+type PlanDay = {
+  date: string;
+  theme?: string;
+  tasks: string[];
+};
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 
