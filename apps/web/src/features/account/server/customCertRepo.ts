@@ -6,6 +6,7 @@ const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
 const CUSTOM_CERTIFICATIONS_TABLE = process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || "CustomCertifications";
 
 type Key = Record<string, any>;
+type DeleteWriteRequest = { DeleteRequest: { Key: Key } };
 
 async function batchDeleteWithRetry(tableName: string, keys: Key[]) {
   if (!keys.length) return 0;
@@ -17,7 +18,7 @@ async function batchDeleteWithRetry(tableName: string, keys: Key[]) {
   let deleted = 0;
 
   for (const chunk of chunks) {
-    let unprocessed = chunk.map((k) => ({ DeleteRequest: { Key: k } }));
+    let unprocessed: DeleteWriteRequest[] = chunk.map((k) => ({ DeleteRequest: { Key: k } }));
 
     // 最大5回リトライ（指数バックオフ）
     for (let attempt = 0; attempt < 5 && unprocessed.length; attempt++) {
@@ -30,7 +31,10 @@ async function batchDeleteWithRetry(tableName: string, keys: Key[]) {
       deleted += unprocessed.length;
 
       const remain = res.UnprocessedItems?.[tableName] ?? [];
-      unprocessed = remain;
+      unprocessed = remain
+        .map((item) => item.DeleteRequest?.Key)
+        .filter((key): key is Key => Boolean(key))
+        .map((key) => ({ DeleteRequest: { Key: key } }));
 
       if (unprocessed.length) {
         const backoffMs = 50 * Math.pow(2, attempt);
