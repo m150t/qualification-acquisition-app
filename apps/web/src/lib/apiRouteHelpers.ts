@@ -9,17 +9,18 @@ import { NextRequest } from "next/server";
 
 export type ServiceError = { status: number; error: string };
 
+type ServiceErrorCandidate = {
+  status?: unknown;
+  error?: unknown;
+};
+
 export function requestIdOf(req: NextRequest) {
   return req.headers.get("x-request-id") ?? crypto.randomUUID();
 }
 
 export function isServiceError(res: unknown): res is ServiceError {
-  return (
-    !!res &&
-    typeof res === "object" &&
-    "status" in res &&
-    "error" in res &&
-    typeof (res as any).status === "number" &&
-    typeof (res as any).error === "string"
-  );
+  if (!res || typeof res !== "object") return false;
+
+  const candidate = res as ServiceErrorCandidate;
+  return typeof candidate.status === "number" && typeof candidate.error === "string";
 }

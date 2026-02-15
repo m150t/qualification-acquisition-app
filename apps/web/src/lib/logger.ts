@@ -11,7 +11,20 @@ const REDACTED = "[REDACTED]";
 const ENV_KEYS_TO_REDACT = [
   // OpenAI
   "OPENAI_API_KEY",
+  // AWS
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_SESSION_TOKEN",
+] as const;
 
+const SENSITIVE_META_KEYS = [
+  "authorization",
+  "cookie",
+  "set-cookie",
+  "x-api-key",
+  "password",
+  "token",
+  "secret",
 ] as const;
 
 // ---- secrets cache
@@ -65,9 +78,27 @@ function sanitizeLogValue(value: unknown, secrets: string[], seen: WeakSet<objec
   return value;
 }
 
+function isSensitiveMetaKey(key: string): boolean {
+  const lowered = key.toLowerCase();
+  return SENSITIVE_META_KEYS.some((sensitiveKey) => lowered.includes(sensitiveKey));
+}
+
+function sanitizeMeta(meta: Record<string, unknown>, secrets: string[]): Record<string, unknown> {
+  const seen = new WeakSet<object>();
+  const out: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(meta)) {
+    out[key] = isSensitiveMetaKey(key)
+      ? REDACTED
+      : sanitizeLogValue(value, secrets, seen);
+  }
+
+  return out;
+}
+
 export function log(level: LogLevel, msg: string, meta: Record<string, unknown> = {}) {
   const secrets = buildSecretValuesOnce();
-  const sanitized = sanitizeLogValue(meta, secrets, new WeakSet());
+  const sanitized = sanitizeMeta(meta, secrets);
 
   // console[level] が存在しない環境の保険
   const fn = console[level] ?? console.log;

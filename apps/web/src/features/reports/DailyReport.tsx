@@ -182,7 +182,7 @@ export default function DailyReport() {
         return;
       }
 
-      // ② AIフィードバック
+      // ② コメント生成API呼び出し（保存した日報内容を渡してコメント候補を取得）
       setIsLoadingFeedback(true);
 
       const feedbackRes = await fetch("/api/feedback", {
@@ -209,12 +209,13 @@ export default function DailyReport() {
         return;
       }
 
+      // APIレスポンスは不正JSONの可能性もあるため、失敗時は空オブジェクトでフォールバック。
       const data = await feedbackRes.json().catch(() => ({}));
       if (data.comment) {
         setAiComment(data.comment);
 
-        // ★ ここでDB更新
-        await fetch("/api/reports", {
+        // ③ 取得したコメントを日報レコードへ反映（画面表示だけで終わらせない）
+        const patchRes = await fetch("/api/reports", {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -225,7 +226,16 @@ export default function DailyReport() {
             aiComment: data.comment,
           }),
         });
+
+        if (!patchRes.ok) {
+          console.error(
+            "report patch(aiComment) error",
+            patchRes.status,
+            await patchRes.text()
+          );
+        }
       } else {
+        console.warn("feedback response has no comment field", { date });
         setAiComment("コメントを取得できませんでした（comment フィールドが空でした）。");
       }
     } catch (e) {

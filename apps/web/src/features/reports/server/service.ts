@@ -154,17 +154,54 @@ export async function clearReports(params: { userId: string; requestId: string }
 export async function patchAiComment(params: { userId: string; body: any; requestId: string }) {
   const { userId, body, requestId } = params;
 
+  // PATCH /api/reports は「同日で最新の日報1件」を対象にコメントを更新する。
+  // 処理の流れ:
+  // 1) 入力値を検証（date, aiComment）
+  // 2) reportDate から更新対象レコードのキーを探索
+  // 3) 見つかった1件に対して update
+  // 4) 各段階で requestId と user hash をログに残して追跡可能にする
   const reportDateOrErr = validateReportDate(body?.date);
-  if (typeof reportDateOrErr !== "string") return reportDateOrErr;
+  if (typeof reportDateOrErr !== "string") {
+    log("warn", "reports patch validation error", {
+      requestId,
+      userIdHash: hash8(userId),
+      reason: reportDateOrErr.error,
+    });
+    return reportDateOrErr;
+  }
   const reportDate = reportDateOrErr;
 
   const aiCommentOrErr = validateAiComment(body?.aiComment);
-  if (typeof aiCommentOrErr !== "string") return aiCommentOrErr;
+  if (typeof aiCommentOrErr !== "string") {
+    log("warn", "reports patch validation error", {
+      requestId,
+      userIdHash: hash8(userId),
+      date: reportDate,
+      reason: aiCommentOrErr.error,
+    });
+    return aiCommentOrErr;
+  }
   const aiComment = aiCommentOrErr;
 
+  // 本文そのものはログに出さず、長さだけを記録して個人情報混入を防ぐ。
+  log("info", "reports patch input", {
+    requestId,
+    userIdHash: hash8(userId),
+    date: reportDate,
+    aiCommentLength: aiComment.length,
+  });
+
   try {
+    // 「同日で最新」を引くため、まず日付でキーを検索する。
     const key = await findLatestReportKeyByReportDate(userId, reportDate);
-    if (!key) return { status: 404, error: "report not found" } satisfies ServiceError;
+    if (!key) {
+      log("warn", "reports patch target not found", {
+        requestId,
+        userIdHash: hash8(userId),
+        date: reportDate,
+      });
+      return { status: 404, error: "report not found" } satisfies ServiceError;
+    }
 
     await updateAiComment(key, aiComment);
 
@@ -177,7 +214,7 @@ export async function patchAiComment(params: { userId: string; body: any; reques
 
     return { ok: true, requestId };
   } catch (e) {
-    log("error", "reports patch error", { requestId, userIdHash: hash8(userId), error: String(e) });
+    log("error", "reports patch error", { requestId, userIdHash: hash8(userId), date: reportDate, error: String(e) });
     return { status: 500, error: "failed to update report" } satisfies ServiceError;
   }
 }

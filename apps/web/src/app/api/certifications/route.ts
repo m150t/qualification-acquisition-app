@@ -1,14 +1,15 @@
-import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/authServer";
+import { requestIdOf } from "@/lib/apiRouteHelpers";
 import { hash8, log } from "@/lib/logger";
 import { listCertifications } from "@/features/certifications/server/repo";
 
 export async function GET(req: NextRequest) {
-  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+  const requestId = requestIdOf(req);
+
   try {
     const auth = await requireAuth(req);
-    if (!auth) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (!auth) return NextResponse.json({ error: "unauthorized", requestId }, { status: 401 });
 
     const certifications = await listCertifications();
 
