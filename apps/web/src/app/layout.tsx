@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://qua-log.com"),
   title: "QUALog｜資格学習を続けるためのアプリ",
   description: "学習計画が崩れても、戻れる。資格学習の継続を支えるアプリ。",
+  other: {
+    "google-adsense-account": "ca-pub-3961829109868432",
+  },
   openGraph: {
     title: "QUALog｜資格学習が1日で止まらないための学習ログ",
     description: "学習計画が崩れても、戻れる。資格学習の継続を支えるアプリ。",
