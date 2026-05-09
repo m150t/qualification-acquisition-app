@@ -50,7 +50,7 @@ export default function Privacy() {
         </Section>
 
         <Section title="6. 退会およびデータ削除">
-          <ul style={{ marginTop: 8, paddingLeft: 18 }}></ul>
+          <ul style={{ marginTop: 8, paddingLeft: 18 }}>
           <p>利用者は、本サービス内の退会機能を利用することで、アカウントおよび関連する利用者データを削除できます。</p>
           <p>退会後、当該データは即時削除されます。</p> 
           <p>1年間ログインがないユーザーは強制退会扱いとなり、利用者データも自動的に削除されます。</p>  
