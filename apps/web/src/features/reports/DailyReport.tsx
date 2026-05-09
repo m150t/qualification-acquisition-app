@@ -6,9 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, Sparkles, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronLeft, Sparkles, Clock, CircleCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getAuthHeaders } from "@/lib/authClient";
+
+type DailyReportItem = {
+  date: string;
+  content?: string;
+  taskStatuses?: Record<string, boolean> | null;
+};
 
 type PlanDay = {
   date: string; // "YYYY-MM-DD"
@@ -42,9 +49,9 @@ export default function DailyReport() {
   const todayStr = new Date().toISOString().split("T")[0];
 
   const [date, setDate] = useState(todayStr);
-  const [studyTime, setStudyTime] = useState<string>("");
-  const [tasksCompleted, setTasksCompleted] = useState<string>("");
-  const [content, setContent] = useState("");
+  const [studyTime, setStudyTime] = useState<string>("0");
+  const [memo, setMemo] = useState("");
+  const [taskStatuses, setTaskStatuses] = useState<Record<string, boolean>>({});
   const [aiComment, setAiComment] = useState<string>("");
 
   const [isSaving, setIsSaving] = useState(false);
@@ -56,6 +63,7 @@ export default function DailyReport() {
   const [planError, setPlanError] = useState<string | null>(null);
   const [postponeError, setPostponeError] = useState<string | null>(null);
   const [isPostponing, setIsPostponing] = useState(false);
+  const [reportsByDate, setReportsByDate] = useState<Record<string, DailyReportItem>>({});
 
   // date が変わったら、その日の plan を引く
   const selectedPlan = useMemo(() => {
@@ -63,6 +71,8 @@ export default function DailyReport() {
     return planByDate[date] ?? null;
   }, [date, planByDate]);
   const isRestDay = Boolean(selectedPlan && selectedPlan.tasks.length === 0);
+  const selectedReport = reportsByDate[date] ?? null;
+  const completedTaskCount = selectedPlan?.tasks?.filter((t) => taskStatuses[t]).length ?? 0;
 
   // 初回だけ plan を取得（軽いので毎回じゃなくてOK）
   useEffect(() => {
@@ -101,6 +111,34 @@ export default function DailyReport() {
 
     fetchGoals();
   }, []);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch("/api/reports", { headers: authHeaders });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const reports: DailyReportItem[] = Array.isArray(data.reports) ? data.reports : [];
+        const byDate: Record<string, DailyReportItem> = {};
+        for (const r of reports) {
+          if (typeof r?.date !== "string") continue;
+          if (!byDate[r.date]) byDate[r.date] = r;
+        }
+        setReportsByDate(byDate);
+      } catch (e) {
+        console.error("failed to fetch reports", e);
+      }
+    };
+
+    fetchReports();
+  }, []);
+
+  useEffect(() => {
+    const report = reportsByDate[date];
+    setMemo(typeof report?.content === "string" ? report.content : "");
+    setTaskStatuses(report?.taskStatuses && typeof report.taskStatuses === "object" ? report.taskStatuses : {});
+  }, [date, reportsByDate]);
 
   const handlePostpone = async () => {
     if (!date) return;
@@ -153,6 +191,10 @@ export default function DailyReport() {
     }
   };
 
+  const toggleTaskStatus = (task: string) => {
+    setTaskStatuses((prev) => ({ ...prev, [task]: !prev[task] }));
+  };
+
   const handleSave = async () => {
     setFeedbackError(null);
     setIsSaving(true);
@@ -170,8 +212,9 @@ export default function DailyReport() {
         body: JSON.stringify({
           date,
           studyTime,
-          tasksCompleted,
-          content,
+          tasksCompleted: completedTaskCount,
+          content: memo,
+          taskStatuses,
         }),
       });
 
@@ -181,6 +224,11 @@ export default function DailyReport() {
         setIsSaving(false);
         return;
       }
+
+      setReportsByDate((prev) => ({
+        ...prev,
+        [date]: { date, content: memo, taskStatuses },
+      }));
 
       // ② コメント生成API呼び出し（保存した日報内容を渡してコメント候補を取得）
       setIsLoadingFeedback(true);
@@ -193,9 +241,9 @@ export default function DailyReport() {
         },
         body: JSON.stringify({
           date,
-          content,
+          content: memo,
           studyTime,
-          tasksCompleted,
+          tasksCompleted: completedTaskCount,
         }),
       });
 
@@ -283,11 +331,30 @@ export default function DailyReport() {
           {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
           {postponeError && <p className="mt-2 text-sm text-red-600">{postponeError}</p>}
 
+          {selectedReport?.content ? (
+            <div className="mt-3 rounded-md bg-amber-50 p-3">
+              <p className="text-xs text-amber-700">この日のメモ</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{selectedReport.content}</p>
+            </div>
+          ) : null}
+
           {!planError && selectedPlan?.tasks?.length ? (
             <div className="mt-4 space-y-3">
               {selectedPlan.tasks.map((t, i) => (
                 <div key={i} className="rounded-lg border border-gray-200 bg-white p-4">
                   <p className="text-sm font-medium text-gray-900">{t}</p>
+
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={taskStatuses[t] ? "default" : "outline"}
+                      className={taskStatuses[t] ? "bg-green-600 text-white hover:bg-green-700" : "border-green-300 text-green-700 hover:bg-green-50"}
+                      onClick={() => toggleTaskStatus(t)}
+                    >
+                      <CircleCheck className="mr-1 h-4 w-4" />Done
+                    </Button>
+                  </div>
 
                   <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
                     <div className="flex items-center gap-1">
@@ -327,41 +394,27 @@ export default function DailyReport() {
 
           {/* 学習時間 */}
           <div className="space-y-2">
-            <Label htmlFor="study-time">学習時間（時間）</Label>
-            <Input
-              id="study-time"
-              type="number"
-              min={0}
-              step={0.5}
-              value={studyTime}
-              onChange={(e) => setStudyTime(e.target.value)}
-              placeholder="例）1.5"
-            />
+            <Label htmlFor="study-time">学習時間</Label>
+            <Select value={studyTime} onValueChange={setStudyTime}>
+              <SelectTrigger id="study-time">
+                <SelectValue placeholder="学習時間を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {["0","0.5","1","1.5","2","2.5","3","4","5","6"].map((h) => (
+                  <SelectItem key={h} value={h}>{h}時間</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* 完了タスク数 */}
           <div className="space-y-2">
-            <Label htmlFor="tasks-completed">完了タスク数</Label>
-            <Input
-              id="tasks-completed"
-              type="number"
-              min={0}
-              step={1}
-              value={tasksCompleted}
-              onChange={(e) => setTasksCompleted(e.target.value)}
-              placeholder="例）3"
-            />
-          </div>
-
-          {/* 学習内容 */}
-          <div className="space-y-2">
-            <Label htmlFor="content">今日やったこと</Label>
+            <Label htmlFor="memo">メモ</Label>
             <Textarea
-              id="content"
-              rows={5}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="例）IAMポリシーの基本を学んだ。EC2ハンズオンを1章分進めた など"
+              id="memo"
+              rows={4}
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="メモを入力"
             />
           </div>
 
