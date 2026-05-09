@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Sparkles, Clock, CircleCheck, CircleX } from "lucide-react";
+import { ChevronLeft, Sparkles, Clock, CircleCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getAuthHeaders } from "@/lib/authClient";
 
@@ -49,7 +49,7 @@ export default function DailyReport() {
   const todayStr = new Date().toISOString().split("T")[0];
 
   const [date, setDate] = useState(todayStr);
-  const [studyTime, setStudyTime] = useState<string>("");
+  const [studyTime, setStudyTime] = useState<string>("0");
   const [memo, setMemo] = useState("");
   const [taskStatuses, setTaskStatuses] = useState<Record<string, boolean>>({});
   const [aiComment, setAiComment] = useState<string>("");
@@ -191,8 +191,8 @@ export default function DailyReport() {
     }
   };
 
-  const toggleTaskStatus = (task: string, done: boolean) => {
-    setTaskStatuses((prev) => ({ ...prev, [task]: done }));
+  const toggleTaskStatus = (task: string) => {
+    setTaskStatuses((prev) => ({ ...prev, [task]: !prev[task] }));
   };
 
   const handleSave = async () => {
@@ -344,12 +344,15 @@ export default function DailyReport() {
                 <div key={i} className="rounded-lg border border-gray-200 bg-white p-4">
                   <p className="text-sm font-medium text-gray-900">{t}</p>
 
-                  <div className="mt-3 flex gap-2">
-                    <Button type="button" size="sm" variant={taskStatuses[t] ? "default" : "outline"} onClick={() => toggleTaskStatus(t, true)}>
-                      <CircleCheck className="mr-1 h-4 w-4" />やった
-                    </Button>
-                    <Button type="button" size="sm" variant={taskStatuses[t] === false ? "destructive" : "outline"} onClick={() => toggleTaskStatus(t, false)}>
-                      <CircleX className="mr-1 h-4 w-4" />やってない
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={taskStatuses[t] ? "default" : "outline"}
+                      className={taskStatuses[t] ? "bg-green-600 text-white hover:bg-green-700" : "border-green-300 text-green-700 hover:bg-green-50"}
+                      onClick={() => toggleTaskStatus(t)}
+                    >
+                      <CircleCheck className="mr-1 h-4 w-4" />Done
                     </Button>
                   </div>
 
@@ -404,8 +407,6 @@ export default function DailyReport() {
             </Select>
           </div>
 
-          <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">完了タスク数: {completedTaskCount}（タスクの「やった/やってない」から自動計算）</div>
-
           <div className="space-y-2">
             <Label htmlFor="memo">メモ</Label>
             <Textarea
@@ -413,7 +414,7 @@ export default function DailyReport() {
               rows={4}
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              placeholder="必要ならメモを入力"
+              placeholder="メモを入力"
             />
           </div>
 
