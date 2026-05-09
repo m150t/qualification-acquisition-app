@@ -396,7 +396,7 @@ export default function DailyReport() {
           <div className="space-y-2">
             <Label htmlFor="study-time">学習時間</Label>
             <Select value={studyTime} onValueChange={setStudyTime}>
-              <SelectTrigger id="study-time">
+              <SelectTrigger id="study-time" className="bg-white">
                 <SelectValue placeholder="学習時間を選択" />
               </SelectTrigger>
               <SelectContent>
