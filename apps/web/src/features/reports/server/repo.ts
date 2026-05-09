@@ -26,6 +26,7 @@ export type ReportItem = {
   studyTime: number | null;
   tasksCompleted: number | null;
   content: string;
+  taskStatuses?: Record<string, boolean> | null;
 
   aiComment: string | null;
   savedAt: string;

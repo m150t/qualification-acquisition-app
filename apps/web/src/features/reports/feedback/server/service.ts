@@ -10,7 +10,7 @@ import { buildFeedbackSystemPrompt, buildFeedbackUserPrompt } from "./prompt";
 
 type FeedbackRequest = {
   date: string;
-  content: string;
+  content?: string;
   studyTime?: number | string | null;
   tasksCompleted?: number | string | null;
 };
@@ -70,8 +70,8 @@ export async function generateFeedback(params: {
   const tasksCompleted = safeNumber(input?.tasksCompleted);
 
   if (!date) return badRequest("date is required");
-  if (!content) return badRequest("content is required");
   if (content.length > MAX_CONTENT_LENGTH) return badRequest("content is too long");
+  const normalizedContent = content || "（メモ入力なし）";
 
   // --- rate limit（reports/feedback 用）
   const ip = getClientIp(headers);
@@ -87,7 +87,7 @@ export async function generateFeedback(params: {
     date,
     studyTime,
     tasksCompleted,
-    contentLen: content.length,
+    contentLen: normalizedContent.length,
   });
 
   // --- plan 取得（無くても動く）
@@ -103,7 +103,7 @@ export async function generateFeedback(params: {
   const system = buildFeedbackSystemPrompt();
   const user = buildFeedbackUserPrompt({
     date,
-    content,
+    content: normalizedContent,
     studyTime,
     tasksCompleted,
     planDay,
