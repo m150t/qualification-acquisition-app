@@ -9,7 +9,7 @@ export default function ChangeLog() {
           letterSpacing: "-0.02em",
         }}
       >
-        更新履歴（ベータ版）
+        更新履歴
       </h1>
 
       <p style={{ marginTop: 12, fontSize: 15, color: "#555" }}>
@@ -25,6 +25,11 @@ export default function ChangeLog() {
           fontSize: 15,
         }}
       >
+        <Section title="2026-05">
+          <ul style={{ marginTop: 8, paddingLeft: 18 }}>
+            <li>日報ページの利便性向上</li>
+          </ul>
+        </Section>
         <Section title="2026-01">
           <ul style={{ marginTop: 8, paddingLeft: 18 }}>
             <li>計画修正機能を追加</li>
@@ -45,7 +50,7 @@ export default function ChangeLog() {
         </Section>
 
         <div style={{ marginTop: 28, fontSize: 12, color: "#666" }}>
-          最終更新日：2026-01-01
+          最終更新日：2026-05-09
         </div>
       </div>
     </>

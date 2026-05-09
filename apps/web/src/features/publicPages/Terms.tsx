@@ -20,6 +20,8 @@ export default function Terms() {
 
         <Section title="3. アカウント">
           利用者は、登録情報を正確に提供し、自己の責任で管理します。第三者による不正利用が疑われる場合、速やかに問い合わせ窓口へ連絡してください。
+          <br />
+          1年間ログインがない場合は、強制退会扱いとなり利用者情報学習データを自動削除します。
         </Section>
 
         <Section title="4. 禁止事項">
@@ -67,7 +69,7 @@ export default function Terms() {
           本規約は日本法に準拠し、本サービスに関する紛争は運営者所在地を管轄する裁判所を専属的合意管轄とします。
         </Section>
 
-        <div style={{ marginTop: 28, fontSize: 12, color: "#666" }}>最終更新日：2025-12-26</div>
+        <div style={{ marginTop: 28, fontSize: 12, color: "#666" }}>最終更新日：2026-05-09</div>
       </div>
     </>
   );

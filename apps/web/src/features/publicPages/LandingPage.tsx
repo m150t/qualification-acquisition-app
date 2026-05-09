@@ -26,7 +26,7 @@ export default function LandingPage() {
       </p>
 
       <p style={{ marginTop: 24, fontSize: 14, color: "#555", textAlign: "center" }}>
-        🔧 最近のアップデート：計画変更機能を追加しました（2026/1）
+        🔧 最近のアップデート：日報入力機能を改善しました。（2026/5）
       </p>
 
       <div
