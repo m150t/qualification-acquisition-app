@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, Sparkles, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -43,8 +42,8 @@ export default function DailyReport() {
 
   const [date, setDate] = useState(todayStr);
   const [studyTime, setStudyTime] = useState<string>("");
-  const [tasksCompleted, setTasksCompleted] = useState<string>("");
-  const [content, setContent] = useState("");
+  const [taskStatusByName, setTaskStatusByName] = useState<Record<string, boolean>>({});
+  const [savedTaskStatusByName, setSavedTaskStatusByName] = useState<Record<string, boolean> | null>(null);
   const [aiComment, setAiComment] = useState<string>("");
 
   const [isSaving, setIsSaving] = useState(false);
@@ -63,6 +62,15 @@ export default function DailyReport() {
     return planByDate[date] ?? null;
   }, [date, planByDate]);
   const isRestDay = Boolean(selectedPlan && selectedPlan.tasks.length === 0);
+
+  useEffect(() => {
+    const next: Record<string, boolean> = {};
+    (selectedPlan?.tasks ?? []).forEach((task) => {
+      next[task] = taskStatusByName[task] ?? false;
+    });
+    setTaskStatusByName(next);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, selectedPlan?.tasks?.join("||")]);
 
   // 初回だけ plan を取得（軽いので毎回じゃなくてOK）
   useEffect(() => {
@@ -153,6 +161,45 @@ export default function DailyReport() {
     }
   };
 
+  const completedCount = useMemo(() => Object.values(taskStatusByName).filter(Boolean).length, [taskStatusByName]);
+
+  const buildSerializedContent = () => {
+    const payload = {
+      taskStatus: (selectedPlan?.tasks ?? []).map((task) => ({
+        task,
+        done: Boolean(taskStatusByName[task]),
+      })),
+    };
+    return `TASK_STATUS_JSON:${JSON.stringify(payload)}`;
+  };
+
+  const parseTaskStatusFromContent = (raw: unknown): Record<string, boolean> | null => {
+    const content = String(raw ?? "");
+    if (!content.startsWith("TASK_STATUS_JSON:")) return null;
+    try {
+      const parsed = JSON.parse(content.replace("TASK_STATUS_JSON:", ""));
+      const items = Array.isArray(parsed?.taskStatus) ? parsed.taskStatus : [];
+      const mapped: Record<string, boolean> = {};
+      for (const item of items) {
+        if (!item || typeof item.task !== "string") continue;
+        mapped[item.task] = Boolean(item.done);
+      }
+      return mapped;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadSavedTaskStatus = async (authHeaders: Record<string, string>) => {
+    const res = await fetch("/api/reports", { headers: authHeaders });
+    if (!res.ok) return;
+    const data = await res.json().catch(() => ({}));
+    const reports = Array.isArray(data?.reports) ? data.reports : [];
+    const sameDate = reports.find((r) => r?.date === date);
+    const parsed = parseTaskStatusFromContent(sameDate?.content);
+    if (parsed) setSavedTaskStatusByName(parsed);
+  };
+
   const handleSave = async () => {
     setFeedbackError(null);
     setIsSaving(true);
@@ -170,8 +217,8 @@ export default function DailyReport() {
         body: JSON.stringify({
           date,
           studyTime,
-          tasksCompleted,
-          content,
+          tasksCompleted: completedCount,
+          content: buildSerializedContent(),
         }),
       });
 
@@ -181,6 +228,8 @@ export default function DailyReport() {
         setIsSaving(false);
         return;
       }
+
+      await loadSavedTaskStatus(authHeaders);
 
       // ② コメント生成API呼び出し（保存した日報内容を渡してコメント候補を取得）
       setIsLoadingFeedback(true);
@@ -193,9 +242,9 @@ export default function DailyReport() {
         },
         body: JSON.stringify({
           date,
-          content,
+          content: buildSerializedContent(),
           studyTime,
-          tasksCompleted,
+          tasksCompleted: completedCount,
         }),
       });
 
@@ -280,6 +329,28 @@ export default function DailyReport() {
             </Button>
           </div>
 
+          <div className="space-y-2">
+            <Label>タスク実施状況（やった/やってない）</Label>
+            {selectedPlan?.tasks?.length ? (
+              <div className="space-y-2">
+                {selectedPlan.tasks.map((task) => {
+                  const done = Boolean(taskStatusByName[task]);
+                  return (
+                    <div key={task} className="flex items-center justify-between rounded border border-gray-200 p-2">
+                      <span className="text-sm text-gray-900">{task}</span>
+                      <Button type="button" variant={done ? "default" : "outline"} size="sm" onClick={() => setTaskStatusByName((prev) => ({ ...prev, [task]: !done }))}>
+                        {done ? "やった" : "やってない"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">この日のタスクがありません。</p>
+            )}
+            <p className="text-xs text-gray-500">完了タスク数: {completedCount} 件</p>
+          </div>
+
           {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
           {postponeError && <p className="mt-2 text-sm text-red-600">{postponeError}</p>}
 
@@ -339,32 +410,6 @@ export default function DailyReport() {
             />
           </div>
 
-          {/* 完了タスク数 */}
-          <div className="space-y-2">
-            <Label htmlFor="tasks-completed">完了タスク数</Label>
-            <Input
-              id="tasks-completed"
-              type="number"
-              min={0}
-              step={1}
-              value={tasksCompleted}
-              onChange={(e) => setTasksCompleted(e.target.value)}
-              placeholder="例）3"
-            />
-          </div>
-
-          {/* 学習内容 */}
-          <div className="space-y-2">
-            <Label htmlFor="content">今日やったこと</Label>
-            <Textarea
-              id="content"
-              rows={5}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="例）IAMポリシーの基本を学んだ。EC2ハンズオンを1章分進めた など"
-            />
-          </div>
-
           <Button
             onClick={handleSave}
             disabled={isSaving || isLoadingFeedback}
@@ -374,6 +419,19 @@ export default function DailyReport() {
               ? "保存中… / AIコメント取得中…"
               : "保存してAIコメントを見る"}
           </Button>
+        </Card>
+
+        <Card className="space-y-2 p-4">
+          <p className="text-sm font-medium text-gray-900">登録済みの実施状況（{date}）</p>
+          {savedTaskStatusByName ? (
+            <div className="space-y-1">
+              {Object.entries(savedTaskStatusByName).map(([task, done]) => (
+                <p key={task} className="text-sm text-gray-700">{task}: {done ? "やった" : "やってない"}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">まだこの日の実施状況は登録されていません。</p>
+          )}
         </Card>
 
         {/* AIフィードバック */}
