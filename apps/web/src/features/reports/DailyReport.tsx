@@ -399,7 +399,7 @@ export default function DailyReport() {
               <SelectTrigger id="study-time" className="bg-white">
                 <SelectValue placeholder="学習時間を選択" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-50 bg-white">
                 {["0","0.5","1","1.5","2","2.5","3","4","5","6"].map((h) => (
                   <SelectItem key={h} value={h}>{h}時間</SelectItem>
                 ))}
