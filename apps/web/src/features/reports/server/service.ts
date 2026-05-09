@@ -12,6 +12,7 @@ import {
 } from "./repo";
 
 const MAX_CONTENT_LENGTH = 4000;
+const MAX_TASKS_TRACKED = 100;
 const MAX_DATE_LENGTH = 20;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -68,7 +69,24 @@ export async function saveReport(params: { userId: string; body: any; requestId:
   if (tcErr) return tcErr;
 
   const content = String(body?.content ?? "").slice(0, MAX_CONTENT_LENGTH).trim();
-  if (!content) return { status: 400, error: "content is required" } satisfies ServiceError;
+
+  const rawStatuses = body?.taskStatuses;
+  let taskStatuses: Record<string, boolean> | null = null;
+  if (rawStatuses != null) {
+    if (typeof rawStatuses !== "object" || Array.isArray(rawStatuses)) {
+      return { status: 400, error: "taskStatuses must be an object" } satisfies ServiceError;
+    }
+    const entries = Object.entries(rawStatuses).slice(0, MAX_TASKS_TRACKED);
+    taskStatuses = {};
+    for (const [k, v] of entries) {
+      const key = String(k).slice(0, 200).trim();
+      if (!key) continue;
+      if (typeof v !== "boolean") {
+        return { status: 400, error: "taskStatuses values must be boolean" } satisfies ServiceError;
+      }
+      taskStatuses[key] = v;
+    }
+  }
 
   const savedAt = new Date().toISOString();
 
@@ -80,6 +98,7 @@ export async function saveReport(params: { userId: string; body: any; requestId:
       studyTime,
       tasksCompleted,
       content,
+      taskStatuses,
       aiComment: body?.aiComment ?? null,
       savedAt,
     });
