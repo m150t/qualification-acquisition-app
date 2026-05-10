@@ -364,9 +364,6 @@ export default function Dashboard() {
     return 'こんばんは';
   }, []);
 
-  const handleShowResult = () => {
-    setStatusMessage(null);
-  };
 
   const clearUserData = async () => {
     const authHeaders = await getAuthHeaders();
@@ -522,23 +519,15 @@ export default function Dashboard() {
         {/* 試験結果入力（試験日を過ぎたとき） */}
         {isExamOver && (
           <Card className="border-red-200 bg-red-50 p-4">
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2">
               <h3 className="text-gray-900">試験結果を教えてください</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShowResult}
-                disabled={isProcessingResult}
-              >
-                更新
-              </Button>
             </div>
             <p className="text-sm text-gray-700">
               試験日を過ぎています。結果を選択してください。
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Button
-                className="bg-green-600 text-white hover:bg-green-700"
+                className="h-auto w-full whitespace-normal break-words px-3 py-2 text-xs leading-tight sm:text-sm bg-white text-black border border-gray-300 hover:bg-gray-100"
                 onClick={handlePassed}
                 disabled={isProcessingResult}
               >
@@ -546,6 +535,7 @@ export default function Dashboard() {
               </Button>
               <Button
                 variant="outline"
+                className="h-auto w-full whitespace-normal break-words px-3 py-2 text-xs leading-tight sm:text-sm bg-white text-black border-gray-300 hover:bg-gray-100"
                 onClick={handleReschedule}
                 disabled={isProcessingResult}
               >
@@ -576,7 +566,7 @@ export default function Dashboard() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="mt-2 w-full border-amber-300 text-amber-900 hover:bg-amber-100"
+                    className="mt-2 w-full bg-white text-black border-gray-300 hover:bg-gray-100"
                     onClick={() => router.push('/goal')}
                   >
                     計画を修正する
