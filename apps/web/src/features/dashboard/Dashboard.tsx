@@ -519,15 +519,14 @@ export default function Dashboard() {
         {/* 試験結果入力（試験日を過ぎたとき） */}
         {isExamOver && (
           <Card className="border-red-200 bg-red-50 p-4">
-            <div className="mb-2">
-              <h3 className="text-gray-900">試験結果を教えてください</h3>
-            </div>
+            <h3 className="text-gray-900">試験結果を教えてください</h3>
             <p className="text-sm text-gray-700">
               試験日を過ぎています。結果を選択してください。
             </p>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Button
-                className="h-auto w-full whitespace-normal break-words px-3 py-2 text-xs leading-tight sm:text-sm bg-white text-black border border-gray-300 hover:bg-gray-100"
+                size="sm"
+                className="h-auto w-full whitespace-normal break-words bg-green-600 text-white hover:bg-green-700"
                 onClick={handlePassed}
                 disabled={isProcessingResult}
               >
@@ -535,7 +534,8 @@ export default function Dashboard() {
               </Button>
               <Button
                 variant="outline"
-                className="h-auto w-full whitespace-normal break-words px-3 py-2 text-xs leading-tight sm:text-sm bg-white text-black border-gray-300 hover:bg-gray-100"
+                size="sm"
+                className="h-auto w-full whitespace-normal break-words bg-white text-black border-gray-300 hover:bg-gray-100"
                 onClick={handleReschedule}
                 disabled={isProcessingResult}
               >
