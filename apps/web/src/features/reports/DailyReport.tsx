@@ -349,7 +349,7 @@ export default function DailyReport() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 px-2 text-xs"
+                className="h-8 px-2 !text-xs"
                 onClick={handlePostpone}
                 disabled={isPostponing || !selectedPlan?.tasks?.length}
               >

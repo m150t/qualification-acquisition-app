@@ -520,13 +520,11 @@ export default function Dashboard() {
         {isExamOver && (
           <Card className="border-red-200 bg-red-50 p-4">
             <h3 className="m-0 leading-tight text-gray-900">試験結果を教えてください</h3>
-            <p className="m-0 text-sm text-gray-700">
-              試験日を過ぎています。結果を選択してください。
-            </p>
-            <div className="mt-0 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <p className="m-0 text-sm leading-tight text-gray-700">試験日を過ぎています。結果を選択してください。</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Button
                 size="sm"
-                className="h-auto w-full whitespace-normal break-words text-xs bg-green-600 text-white hover:bg-green-700"
+                className="h-auto w-full whitespace-normal break-words !text-xs bg-green-600 text-white hover:bg-green-700"
                 onClick={handlePassed}
                 disabled={isProcessingResult}
               >
@@ -535,7 +533,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-auto w-full whitespace-normal break-words text-xs bg-white text-black border-gray-300 hover:bg-gray-100"
+                className="h-auto w-full whitespace-normal break-words !text-xs bg-white text-black border-gray-300 hover:bg-gray-100"
                 onClick={handleReschedule}
                 disabled={isProcessingResult}
               >
@@ -566,7 +564,7 @@ export default function Dashboard() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="mt-2 w-full bg-white text-black border-gray-300 hover:bg-gray-100"
+                    className="mt-2 w-full !text-xs bg-white text-black border-gray-300 hover:bg-gray-100"
                     onClick={() => router.push('/goal')}
                   >
                     計画を修正する
