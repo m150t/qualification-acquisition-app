@@ -322,7 +322,7 @@ export default function DailyReport() {
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="max-w-full text-sm"
+                  className="w-full min-w-0 text-sm sm:text-base"
                 />
               </div>
               <div className="space-y-2">
@@ -342,15 +342,14 @@ export default function DailyReport() {
           </div>
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-900">この日のタスク</p>
-                {selectedPlan?.theme ? <p className="text-xs text-blue-600">テーマ: {selectedPlan.theme}</p> : null}
-              </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-900">この日のタスク</p>
+              {selectedPlan?.theme ? <p className="text-xs text-blue-600">テーマ: {selectedPlan.theme}</p> : null}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="h-8 px-2 text-xs"
                 onClick={handlePostpone}
                 disabled={isPostponing || !selectedPlan?.tasks?.length}
               >
@@ -364,9 +363,9 @@ export default function DailyReport() {
             {!planError && selectedPlan?.tasks?.length ? (
               <div className="mt-3 space-y-2">
                 {selectedPlan.tasks.map((t, i) => (
-                  <div key={i} className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white p-3">
+                  <div key={i} className="flex flex-col gap-2 rounded-md border border-gray-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900">{t}</p>
+                      <p className="whitespace-pre-wrap break-words text-sm font-medium text-gray-900">{t}</p>
                       <p className="mt-1 flex items-center gap-1 text-xs text-gray-500"><Clock className="h-3 w-3" />目安30分</p>
                     </div>
                     <Button
@@ -377,7 +376,7 @@ export default function DailyReport() {
                       onClick={() => toggleTaskStatus(t)}
                     >
                       <CircleCheck className="mr-1 h-4 w-4" />
-                      {taskStatuses[t] ? "完了" : "未完了"}
+                      Done
                     </Button>
                   </div>
                 ))}
