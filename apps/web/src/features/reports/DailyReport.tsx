@@ -389,6 +389,7 @@ export default function DailyReport() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              className="max-w-full text-sm"
             />
           </div>
 
