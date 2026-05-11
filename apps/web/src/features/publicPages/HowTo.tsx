@@ -68,7 +68,7 @@ export default function HowTo() {
         >
           <iframe
             title="QUALog 操作説明動画"
-            src="https://www.youtube.com/embed/3u2v8XkViHw"
+            src="https://youtu.be/Se1aWAhwpms"
             style={{
               position: "absolute",
               inset: 0,

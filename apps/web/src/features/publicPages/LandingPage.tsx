@@ -96,7 +96,7 @@ export default function LandingPage() {
           >
             <iframe
               title="QUALog ショート動画"
-              src="https://www.youtube.com/embed/YY7D6M6sYS4?rel=0"
+              src="https://youtube.com/shorts/JJGVtj9iwng?feature=share"
               style={{
                 position: "absolute",
                 inset: 0,
