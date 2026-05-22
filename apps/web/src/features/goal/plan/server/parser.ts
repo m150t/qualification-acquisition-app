@@ -1,17 +1,38 @@
 import { sanitizePlan } from "./normalize";
 import type { PlanDay } from "./types";
+import { PlanResponseSchema } from "./validators";
 
-function extractPlanPayload(payload: unknown): PlanDay[] {
-  if (Array.isArray(payload)) return sanitizePlan(payload);
-  if (payload && typeof payload === "object" && "plan" in payload) {
-    return sanitizePlan((payload as { plan?: unknown }).plan);
+export type PlanParseResult = {
+  plan: PlanDay[];
+  validationError?: string;
+};
+
+function validatePlanPayload(payload: unknown): PlanParseResult {
+  const parsed = PlanResponseSchema.safeParse(payload);
+
+  if (parsed.success) {
+    return { plan: sanitizePlan(parsed.data) };
   }
-  return [];
+
+  return {
+    plan: [],
+    validationError: parsed.error.issues
+      .map((issue) => issue.path.join(".") || issue.message)
+      .join(", "),
+  };
 }
 
-export function parsePlanFromText(text: string): PlanDay[] {
+function extractPlanPayload(payload: unknown): PlanParseResult {
+  if (Array.isArray(payload)) return validatePlanPayload(payload);
+  if (payload && typeof payload === "object" && "plan" in payload) {
+    return validatePlanPayload((payload as { plan?: unknown }).plan);
+  }
+  return { plan: [] };
+}
+
+export function parsePlanFromTextResult(text: string): PlanParseResult {
   const t = String(text ?? "").trim();
-  if (!t) return [];
+  if (!t) return { plan: [] };
 
   // 1) まず JSON として素直にパース
   try {
@@ -27,5 +48,9 @@ export function parsePlanFromText(text: string): PlanDay[] {
     } catch {}
   }
 
-  return [];
+  return { plan: [] };
+}
+
+export function parsePlanFromText(text: string): PlanDay[] {
+  return parsePlanFromTextResult(text).plan;
 }

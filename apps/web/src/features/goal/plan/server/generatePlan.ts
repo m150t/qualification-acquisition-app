@@ -6,7 +6,7 @@ import { hash8, log } from "@/lib/logger";
 import type { PlanDay } from "./types";
 import { getExamGuideByCode } from "./examGuideRepo";
 import { buildPlanPrompt } from "./prompt";
-import { parsePlanFromText } from "./parser";
+import { parsePlanFromTextResult } from "./parser";
 import { validateGeneratePlanRequest } from "./validators";
 import { createOpenAiClient } from "@/lib/ai/client";
 import { withTimeout } from "@/lib/ai/timeout";
@@ -83,7 +83,19 @@ export async function generatePlan(params: {
     );
 
     const text = String(completion.choices?.[0]?.message?.content ?? "").trim();
-    const plan = parsePlanFromText(text);
+    const parsedPlan = parsePlanFromTextResult(text);
+    const plan = parsedPlan.plan;
+
+    if (parsedPlan.validationError) {
+      log("warn", "plan response validation failed", {
+        requestId,
+        userIdHash: hash8(userId),
+        error: parsedPlan.validationError,
+        responseLength: text.length,
+        model: completion.model,
+        finishReason: completion.choices?.[0]?.finish_reason,
+      });
+    }
 
     log("info", "plan generate success", {
       requestId,

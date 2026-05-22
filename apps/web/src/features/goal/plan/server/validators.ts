@@ -1,6 +1,7 @@
 // ==================================================
 // 入力検証だけ
 // ==================================================
+import { z } from "zod";
 import type { GeneratePlanRequest } from "./types";
 
 const MAX_CERT_NAME_LENGTH = 200;
@@ -15,8 +16,37 @@ type GeneratePlanRequestBody = {
   };
 };
 
+export const GeneratePlanRequestSchema = z
+  .object({
+    goal: z
+      .object({
+        certCode: z.unknown().optional(),
+        certName: z.unknown().optional(),
+        examDate: z.unknown().optional(),
+        weeklyHours: z.unknown().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+export const PlanDaySchema = z
+  .object({
+    date: z.string(),
+    theme: z.string().optional(),
+    tasks: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
+export const PlanResponseSchema = z.array(PlanDaySchema);
+
 export function validateGeneratePlanRequest(body: unknown): { ok: true; value: GeneratePlanRequest } | { ok: false; error: string } {
-  const input = body && typeof body === "object" ? (body as GeneratePlanRequestBody) : {};
+  const parsed = GeneratePlanRequestSchema.safeParse(
+    body && typeof body === "object" ? body : {},
+  );
+  if (!parsed.success) return { ok: false, error: "goal is required" };
+
+  const input = parsed.data as GeneratePlanRequestBody;
   const goal = input.goal;
   if (!goal) return { ok: false, error: "goal is required" };
 
