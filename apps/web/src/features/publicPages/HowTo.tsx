@@ -17,7 +17,7 @@ export default function HowTo() {
 
       <div style={{ marginTop: 26, display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Link
-          href="/app"
+          href="/home"
           style={{
             display: "inline-block",
             padding: "12px 18px",
