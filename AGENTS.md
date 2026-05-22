@@ -84,6 +84,6 @@ PR本文には最低限以下を含める:
 - UI文言から明確に読み取れる内容を重複コメントしない
 
 ## 11. 依存関係・lockfile方針
-- package-lock.json / pnpm-lock.yaml の変更は必要時のみ行う
-- build/install による incidental な lockfile変更は原則戻す
+- build/install による incidental な package-lock.json の変更は原則 revert する
+- lockfile を変更した場合は理由を明記する
 - 依存追加時は理由を説明する
