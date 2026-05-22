@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const cp=require('node:child_process');const root=cp.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim();const result=cp.spawnSync(process.execPath,[root+'/.codex/hooks/after-edit-checks.mjs'],{cwd:root,stdio:'inherit'});process.exit(result.status ?? 1);\"",
+            "timeout": 600,
+            "statusMessage": "Running lint and typecheck after code edit"
+          }
+        ]
+      }
+    ]
+  }
+}

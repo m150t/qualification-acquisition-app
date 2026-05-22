@@ -92,3 +92,9 @@ PR本文には最低限以下を含める:
 - commit前に pre-commit hook で `npm run lint` と `npm run typecheck` が自動実行される
 - 初回セットアップ時は `git config core.hooksPath .githooks` を実行する
 - hookを迂回する場合は、PR本文またはコミット説明に理由を明記する
+
+## 13. Codex hooks運用
+- Codexの編集後に repo-local hook で `npm run lint` と `npm run typecheck` が自動実行される
+- hook失敗時は変更が自動revertされるわけではなく、次の修正対象として扱う
+- 初回は `/hooks` で repo-local hook の trust が必要な場合がある
+- hookが重い場合は無効化/調整してよいが、理由をPR本文または作業記録に明記する

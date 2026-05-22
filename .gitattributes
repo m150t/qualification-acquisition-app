@@ -1,2 +1,4 @@
 .gitattributes text eol=lf
+.codex/hooks.json text eol=lf
+.codex/hooks/*.mjs text eol=lf
 .githooks/* text eol=lf
