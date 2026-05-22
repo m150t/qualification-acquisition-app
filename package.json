@@ -5,6 +5,9 @@
     "apps/*"
   ],
   "scripts": {
+    "lint": "npm --workspace apps/web run lint",
+    "typecheck": "npm --workspace apps/web run typecheck",
+    "build": "npm --workspace apps/web run build",
     "build:web": "npm --workspace apps/web run build",
     "dev:web": "npm --workspace apps/web run dev"
   },
