@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/authServer";
 import { isServiceError, requestIdOf } from "@/lib/apiRouteHelpers";
 import { deleteAccount } from "@/features/account/server/service";

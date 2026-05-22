@@ -4,7 +4,7 @@
 import { hash8, log } from "@/lib/logger";
 import { createOpenAiClient } from "@/lib/ai/client";
 import { withTimeout, isAbortError } from "@/lib/ai/timeout";
-import { ServiceError } from "@/lib/apiRouteHelpers";
+import type { ServiceError } from "@/lib/apiRouteHelpers";
 import { findPlanDay } from "./goalPlanRepo";
 import { buildFeedbackSystemPrompt, buildFeedbackUserPrompt } from "./prompt";
 

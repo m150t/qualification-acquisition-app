@@ -1,7 +1,7 @@
 // ==================================================
 // 入力検証だけ
 // ==================================================
-import { GeneratePlanRequest } from "./types";
+import type { GeneratePlanRequest } from "./types";
 
 const MAX_CERT_NAME_LENGTH = 200;
 const MAX_EXAM_DATE_LENGTH = 20;

@@ -1,4 +1,4 @@
-import { PlanDay } from "./types";
+import type { PlanDay } from "./types";
 
 const MAX_PLAN_DAYS = 366;
 const MAX_TASKS_PER_DAY = 20;

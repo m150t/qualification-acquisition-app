@@ -1,5 +1,5 @@
 import { sanitizePlan } from "./normalize";
-import { PlanDay } from "./types";
+import type { PlanDay } from "./types";
 
 function extractPlanPayload(payload: unknown): PlanDay[] {
   if (Array.isArray(payload)) return sanitizePlan(payload);

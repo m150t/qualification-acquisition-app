@@ -6,7 +6,8 @@
 // - service error を HTTP に変換
 // ==================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/authServer";
 import { isServiceError, requestIdOf } from "@/lib/apiRouteHelpers";
 import { deleteGoal, getGoal, postponePlanDay, saveGoal } from "@/features/goal/server/service";

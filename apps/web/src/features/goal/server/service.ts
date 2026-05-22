@@ -6,8 +6,9 @@ import { hash8, log } from "@/lib/logger";
 import { deleteAllReportsForUser } from "./reportRepo";
 import { deleteGoalItem, getGoalItem, upsertGoalItem, updateGoalPlanOnly } from "./goalRepo";
 import { putCustomCertification } from "./customCertRepo";
+import type {
+  GoalPlanDay} from "./normalize";
 import {
-  GoalPlanDay,
   normalizePlanFromToday,
   normalizeTaskList,
   sortPlanByDate,

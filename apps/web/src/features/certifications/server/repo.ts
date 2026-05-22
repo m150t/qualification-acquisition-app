@@ -4,7 +4,7 @@
 
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/lib/dynamodb";
-import { CertificationDto } from "./dto";
+import type { CertificationDto } from "./dto";
 
 const CERTIFICATIONS_TABLE = process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 
