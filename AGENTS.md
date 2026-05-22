@@ -87,3 +87,8 @@ PR本文には最低限以下を含める:
 - build/install による incidental な package-lock.json の変更は原則 revert する
 - lockfile を変更した場合は理由を明記する
 - 依存追加時は理由を説明する
+
+## 12. Git hooks運用
+- commit前に pre-commit hook で `npm run lint` と `npm run typecheck` が自動実行される
+- 初回セットアップ時は `git config core.hooksPath .githooks` を実行する
+- hookを迂回する場合は、PR本文またはコミット説明に理由を明記する
