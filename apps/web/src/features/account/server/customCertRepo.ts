@@ -5,7 +5,7 @@ const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 const REPORTS_TABLE = process.env.DDB_REPORTS_TABLE || "StudyReports";
 const CUSTOM_CERTIFICATIONS_TABLE = process.env.DDB_CUSTOM_CERTIFICATIONS_TABLE || "CustomCertifications";
 
-type Key = Record<string, any>;
+type Key = Record<string, unknown>;
 type DeleteWriteRequest = { DeleteRequest: { Key: Key } };
 
 async function batchDeleteWithRetry(tableName: string, keys: Key[]) {
@@ -74,7 +74,14 @@ export async function deleteAllReportsByUserId(userId: string) {
       }),
     );
 
-    keys.push(...(((res.Items as any[]) ?? []).map((it) => ({ userId: it.userId, date: it.date }))));
+    keys.push(
+      ...(res.Items ?? [])
+        .map((it) => ({
+          userId: typeof it.userId === "string" ? it.userId : "",
+          date: typeof it.date === "string" ? it.date : "",
+        }))
+        .filter((key) => key.userId && key.date),
+    );
 
     lastEvaluatedKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
   } while (lastEvaluatedKey);
@@ -104,7 +111,11 @@ export async function deleteAllCustomCertificationsByUserId(userId: string) {
       }),
     );
 
-    keys.push(...(((res.Items as any[]) ?? []).map((it) => ({ id: it.id }))));
+    keys.push(
+      ...(res.Items ?? [])
+        .map((it) => ({ id: typeof it.id === "string" ? it.id : "" }))
+        .filter((key) => key.id),
+    );
 
     lastEvaluatedKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
   } while (lastEvaluatedKey);

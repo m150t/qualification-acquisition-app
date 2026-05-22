@@ -15,6 +15,16 @@ export type GoalPlanDay = {
   tasks?: string[];
 };
 
+type PlanInputDay = {
+  theme?: unknown;
+  tasks?: unknown;
+  topics?: unknown;
+};
+
+function isPlanInputDay(value: unknown): value is PlanInputDay {
+  return Boolean(value && typeof value === "object");
+}
+
 export function toDateOnlyString(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -35,17 +45,18 @@ export function normalizePlanFromToday(plan: unknown) {
 
   return plan.slice(0, MAX_PLAN_DAYS).map((day, index) => {
     const date = toDateOnlyString(new Date(today.getTime() + index * MS_PER_DAY)).slice(0, MAX_DATE_LENGTH);
+    const inputDay = isPlanInputDay(day) ? day : {};
 
     const theme =
-      typeof (day as any)?.theme === "string"
-        ? (day as any).theme.trim().slice(0, MAX_THEME_LENGTH)
+      typeof inputDay.theme === "string"
+        ? inputDay.theme.trim().slice(0, MAX_THEME_LENGTH)
         : undefined;
 
     // 過去互換（topicsでも受ける）
-    const rawTasks = Array.isArray((day as any)?.tasks)
-      ? (day as any).tasks
-      : Array.isArray((day as any)?.topics)
-        ? (day as any).topics
+    const rawTasks = Array.isArray(inputDay.tasks)
+      ? inputDay.tasks
+      : Array.isArray(inputDay.topics)
+        ? inputDay.topics
         : [];
 
     const tasks = rawTasks

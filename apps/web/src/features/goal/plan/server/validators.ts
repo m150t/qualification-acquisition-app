@@ -6,8 +6,18 @@ import { GeneratePlanRequest } from "./types";
 const MAX_CERT_NAME_LENGTH = 200;
 const MAX_EXAM_DATE_LENGTH = 20;
 
-export function validateGeneratePlanRequest(body: any): { ok: true; value: GeneratePlanRequest } | { ok: false; error: string } {
-  const goal = body?.goal;
+type GeneratePlanRequestBody = {
+  goal?: {
+    certCode?: unknown;
+    certName?: unknown;
+    examDate?: unknown;
+    weeklyHours?: unknown;
+  };
+};
+
+export function validateGeneratePlanRequest(body: unknown): { ok: true; value: GeneratePlanRequest } | { ok: false; error: string } {
+  const input = body && typeof body === "object" ? (body as GeneratePlanRequestBody) : {};
+  const goal = input.goal;
   if (!goal) return { ok: false, error: "goal is required" };
 
   const certName = String(goal.certName ?? "").trim().slice(0, MAX_CERT_NAME_LENGTH);
@@ -23,7 +33,7 @@ export function validateGeneratePlanRequest(body: any): { ok: true; value: Gener
     ok: true,
     value: {
       goal: {
-        certCode: goal.certCode,
+        certCode: typeof goal.certCode === "string" ? goal.certCode : undefined,
         certName,
         examDate,
         weeklyHours: safeWeeklyHours,

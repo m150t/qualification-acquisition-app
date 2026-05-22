@@ -69,6 +69,12 @@ function parseYmd(ymd: string): Date | null {
   return date;
 }
 
+function getDayPlanTasks(plan: DayPlan): string[] {
+  if (Array.isArray(plan.topics)) return plan.topics;
+  if (Array.isArray(plan.tasks)) return plan.tasks;
+  return [];
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [goal, setGoal] = useState<StudyGoal | null>(null);
@@ -78,7 +84,6 @@ export default function Dashboard() {
   const [plannedDates, setPlannedDates] = useState<string[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isProcessingResult, setIsProcessingResult] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // 「今日」のキー（0:00固定）
   const todayDate = useMemo(() => {
@@ -124,11 +129,7 @@ export default function Dashboard() {
         if (Array.isArray(data.plan)) {
           const plannedTasksCount = data.plan.reduce(
             (sum: number, p: DayPlan) => {
-              const rawTasks = Array.isArray((p as any).topics)
-                ? (p as any).topics
-                : Array.isArray((p as any).tasks)
-                  ? (p as any).tasks
-                  : [];
+              const rawTasks = getDayPlanTasks(p);
               return sum + rawTasks.length;
             },
             0,
@@ -146,11 +147,7 @@ export default function Dashboard() {
           );
 
           if (todayPlan) {
-            const rawTopics = Array.isArray((todayPlan as any).topics)
-              ? (todayPlan as any).topics
-              : Array.isArray((todayPlan as any).tasks)
-                ? (todayPlan as any).tasks
-                : [];
+            const rawTopics = getDayPlanTasks(todayPlan);
             const uiTasks: UiTask[] = rawTopics.map(
               (t: string, idx: number) => ({
                 id: idx + 1,

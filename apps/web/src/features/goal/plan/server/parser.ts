@@ -4,7 +4,7 @@ import { PlanDay } from "./types";
 function extractPlanPayload(payload: unknown): PlanDay[] {
   if (Array.isArray(payload)) return sanitizePlan(payload);
   if (payload && typeof payload === "object" && "plan" in payload) {
-    return sanitizePlan((payload as any).plan);
+    return sanitizePlan((payload as { plan?: unknown }).plan);
   }
   return [];
 }

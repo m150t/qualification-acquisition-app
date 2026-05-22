@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LandingPage() {
   return (
@@ -13,7 +14,7 @@ export default function LandingPage() {
           gap: 18,
         }}
       >
-        <img src="/qualog-logo.svg" alt="QUALog ロゴ" style={{ width: 140, height: "auto" }} />
+        <Image src="/qualog-logo.svg" alt="QUALog ロゴ" width={140} height={140} />
         <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.02em" }}>
           QUALog -試験対策の設計支援と伴走
         </h1>

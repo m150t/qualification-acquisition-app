@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/authClient';
 
@@ -225,15 +225,14 @@ export default function CalendarView() {
     setCurrentDate(newDate);
   };
 
-  // 月を跨いだら選択日をクリア（週表示でも同じselectedDateKeyを使うので、月表示でだけ使われるわけではないが問題なし）
-  useEffect(() => {
-    if (!selectedDateKey) return;
+  const visibleSelectedDateKey = (() => {
+    if (!selectedDateKey) return null;
     const d = new Date(selectedDateKey);
     if (d.getFullYear() !== currentDate.getFullYear() || d.getMonth() !== currentDate.getMonth()) {
-      // 月表示で見てる月が変わったらクリア（週表示は currentDate 連動なので影響少）
-      setSelectedDateKey(null);
+      return null;
     }
-  }, [currentDate, selectedDateKey]);
+    return selectedDateKey;
+  })();
 
   return (
     <div className="min-h-screen bg-gray-50 pb-4">
@@ -304,7 +303,7 @@ export default function CalendarView() {
                 const data = studyData[dateKey];
                 const plannedCount = planByDate[dateKey]?.tasks?.length ?? 0;
                 const isToday = date.toDateString() === new Date().toDateString();
-                const isSelected = selectedDateKey === dateKey;
+                const isSelected = visibleSelectedDateKey === dateKey;
 
                 return (
                   <button
@@ -340,19 +339,19 @@ export default function CalendarView() {
             </div>
 
             {/* Week: Selected Day Details */}
-            {selectedDateKey && (
+            {visibleSelectedDateKey && (
               <div className="mt-4 border-t pt-3">
-                <div className="text-sm text-gray-900 mb-1">{selectedDateKey} の予定</div>
+                <div className="text-sm text-gray-900 mb-1">{visibleSelectedDateKey} の予定</div>
 
-                {planByDate[selectedDateKey]?.theme ? (
+                {planByDate[visibleSelectedDateKey]?.theme ? (
                   <div className="text-xs text-gray-600 mb-2">
-                    テーマ：{planByDate[selectedDateKey].theme}
+                    テーマ：{planByDate[visibleSelectedDateKey].theme}
                   </div>
                 ) : null}
 
-                {planByDate[selectedDateKey]?.tasks?.length ? (
+                {planByDate[visibleSelectedDateKey]?.tasks?.length ? (
                   <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                    {planByDate[selectedDateKey].tasks.map((t, i) => (
+                    {planByDate[visibleSelectedDateKey].tasks.map((t, i) => (
                       <li key={i}>{t}</li>
                     ))}
                   </ul>
@@ -397,7 +396,7 @@ export default function CalendarView() {
 
                 const isToday = date.toDateString() === new Date().toDateString();
                 const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-                const isSelected = selectedDateKey === dateKey;
+                const isSelected = visibleSelectedDateKey === dateKey;
 
                 return (
                   <button
@@ -433,19 +432,19 @@ export default function CalendarView() {
             </div>
 
             {/* Month: Selected Day Details */}
-            {selectedDateKey && (
+            {visibleSelectedDateKey && (
               <div className="mt-4 border-t pt-3">
-                <div className="text-sm text-gray-900 mb-1">{selectedDateKey} の予定</div>
+                <div className="text-sm text-gray-900 mb-1">{visibleSelectedDateKey} の予定</div>
 
-                {planByDate[selectedDateKey]?.theme ? (
+                {planByDate[visibleSelectedDateKey]?.theme ? (
                   <div className="text-xs text-gray-600 mb-2">
-                    テーマ：{planByDate[selectedDateKey].theme}
+                    テーマ：{planByDate[visibleSelectedDateKey].theme}
                   </div>
                 ) : null}
 
-                {planByDate[selectedDateKey]?.tasks?.length ? (
+                {planByDate[visibleSelectedDateKey]?.tasks?.length ? (
                   <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                    {planByDate[selectedDateKey].tasks.map((t, i) => (
+                    {planByDate[visibleSelectedDateKey].tasks.map((t, i) => (
                       <li key={i}>{t}</li>
                     ))}
                   </ul>

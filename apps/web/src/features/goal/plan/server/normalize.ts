@@ -8,11 +8,15 @@ const MAX_THEME_LENGTH = 200;
 export function sanitizePlan(input: unknown): PlanDay[] {
   if (!Array.isArray(input)) return [];
 
-  return input.slice(0, MAX_PLAN_DAYS).map((day: any) => {
-    const date = typeof day?.date === "string" ? String(day.date).trim() : "";
-    const theme = typeof day?.theme === "string" ? day.theme.trim().slice(0, MAX_THEME_LENGTH) : undefined;
+  return input.slice(0, MAX_PLAN_DAYS).map((day) => {
+    const item =
+      day && typeof day === "object"
+        ? (day as { date?: unknown; theme?: unknown; tasks?: unknown })
+        : {};
+    const date = typeof item.date === "string" ? item.date.trim() : "";
+    const theme = typeof item.theme === "string" ? item.theme.trim().slice(0, MAX_THEME_LENGTH) : undefined;
 
-    const rawTasks = Array.isArray(day?.tasks) ? day.tasks : [];
+    const rawTasks = Array.isArray(item.tasks) ? item.tasks : [];
     const tasks = rawTasks
       .filter((t: unknown) => typeof t === "string")
       .slice(0, MAX_TASKS_PER_DAY)

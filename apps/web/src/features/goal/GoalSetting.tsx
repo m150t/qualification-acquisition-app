@@ -17,6 +17,25 @@ type Certification = {
   examGuide?: unknown;
 };
 
+type CertificationApiItem = {
+  code?: unknown;
+  name?: unknown;
+  provider?: unknown;
+  defaultWeeklyHours?: unknown;
+  defaultWeeks?: unknown;
+  examGuide?: unknown;
+};
+
+type ValidCertificationApiItem = CertificationApiItem & {
+  code: string;
+  name: string;
+  provider: string;
+};
+
+function isCertificationApiItem(value: unknown): value is CertificationApiItem {
+  return Boolean(value && typeof value === 'object');
+}
+
 type DayPlan = {
   dayIndex: number;
   date: string; // 'YYYY-MM-DD'
@@ -236,14 +255,14 @@ export default function GoalSetting() {
     if (!cert) return;
 
     if (selectedCertCode === 'other') {
-      if (weeklyHours === '') setWeeklyHours('0');
+      setWeeklyHours((current) => (current === '' ? '0' : current));
       return;
     }
 
     if (cert.defaultWeeklyHours != null) {
       setWeeklyHours(String(cert.defaultWeeklyHours));
     }
-  }, [availableCertifications, selectedCertCode]); // ← weeklyHours入れない
+  }, [availableCertifications, selectedCertCode]);
 
   // ✅ 資格マスタ取得
   useEffect(() => {
@@ -258,19 +277,19 @@ export default function GoalSetting() {
           return;
         }
 
-        const data = await res.json();
-        const list = Array.isArray(data.certifications) ? data.certifications : [];
+        const data = (await res.json()) as { certifications?: unknown };
+        const list: unknown[] = Array.isArray(data.certifications) ? data.certifications : [];
 
         // ✅ ここでテーブル形に寄せておく（provider欠けたら捨てる）
         const normalized: Certification[] = list
           .filter(
-            (c: any) =>
-              c &&
+            (c): c is ValidCertificationApiItem =>
+              isCertificationApiItem(c) &&
               typeof c.code === 'string' &&
               typeof c.name === 'string' &&
               typeof c.provider === 'string',
           )
-          .map((c: any) => ({
+          .map((c) => ({
             code: c.code,
             name: c.name,
             provider: c.provider,

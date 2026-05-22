@@ -156,7 +156,8 @@ export async function generateFeedback(params: {
     return { comment: commentText };
   } catch (e) {
     // タイムアウトは “失敗” 扱いにしない（200で固定文返し）
-    if (isAbortError(e) || String((e as any)?.message ?? e).toLowerCase().includes("aborted")) {
+    const errorLike = e as { message?: unknown };
+    if (isAbortError(e) || String(errorLike.message ?? e).toLowerCase().includes("aborted")) {
       return { comment: "今日はここまででも十分！次は計画と照らして1点だけ復習しよう。" };
     }
 

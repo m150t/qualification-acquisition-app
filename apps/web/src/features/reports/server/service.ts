@@ -52,15 +52,29 @@ function validateNonNegative(name: string, value: number | null): ServiceError |
 // ----------------------
 // usecases
 // ----------------------
-export async function saveReport(params: { userId: string; body: any; requestId: string }) {
-  const { userId, body, requestId } = params;
+type ReportRequestBody = {
+  date?: unknown;
+  studyTime?: unknown;
+  tasksCompleted?: unknown;
+  content?: unknown;
+  taskStatuses?: unknown;
+  aiComment?: unknown;
+};
 
-  const reportDateOrErr = validateReportDate(body?.date);
+function asReportRequestBody(body: unknown): ReportRequestBody {
+  return body && typeof body === "object" ? body : {};
+}
+
+export async function saveReport(params: { userId: string; body: unknown; requestId: string }) {
+  const { userId, body, requestId } = params;
+  const input = asReportRequestBody(body);
+
+  const reportDateOrErr = validateReportDate(input.date);
   if (typeof reportDateOrErr !== "string") return reportDateOrErr;
   const reportDate = reportDateOrErr;
 
-  const studyTime = safeNumber(body?.studyTime);
-  const tasksCompleted = safeNumber(body?.tasksCompleted);
+  const studyTime = safeNumber(input.studyTime);
+  const tasksCompleted = safeNumber(input.tasksCompleted);
 
   const stErr = validateNonNegative("studyTime", studyTime);
   if (stErr) return stErr;
@@ -68,9 +82,9 @@ export async function saveReport(params: { userId: string; body: any; requestId:
   const tcErr = validateNonNegative("tasksCompleted", tasksCompleted);
   if (tcErr) return tcErr;
 
-  const content = String(body?.content ?? "").slice(0, MAX_CONTENT_LENGTH).trim();
+  const content = String(input.content ?? "").slice(0, MAX_CONTENT_LENGTH).trim();
 
-  const rawStatuses = body?.taskStatuses;
+  const rawStatuses = input.taskStatuses;
   let taskStatuses: Record<string, boolean> | null = null;
   if (rawStatuses != null) {
     if (typeof rawStatuses !== "object" || Array.isArray(rawStatuses)) {
@@ -99,7 +113,7 @@ export async function saveReport(params: { userId: string; body: any; requestId:
       tasksCompleted,
       content,
       taskStatuses,
-      aiComment: body?.aiComment ?? null,
+      aiComment: typeof input.aiComment === "string" ? input.aiComment : null,
       savedAt,
     });
 
@@ -107,7 +121,7 @@ export async function saveReport(params: { userId: string; body: any; requestId:
       requestId,
       userIdHash: hash8(userId),
       date: reportDate,
-      hasAiComment: Boolean(body?.aiComment),
+      hasAiComment: Boolean(input.aiComment),
     });
 
     return { ok: true, requestId };
@@ -170,8 +184,9 @@ export async function clearReports(params: { userId: string; requestId: string }
   }
 }
 
-export async function patchAiComment(params: { userId: string; body: any; requestId: string }) {
+export async function patchAiComment(params: { userId: string; body: unknown; requestId: string }) {
   const { userId, body, requestId } = params;
+  const input = asReportRequestBody(body);
 
   // PATCH /api/reports は「同日で最新の日報1件」を対象にコメントを更新する。
   // 処理の流れ:
@@ -179,7 +194,7 @@ export async function patchAiComment(params: { userId: string; body: any; reques
   // 2) reportDate から更新対象レコードのキーを探索
   // 3) 見つかった1件に対して update
   // 4) 各段階で requestId と user hash をログに残して追跡可能にする
-  const reportDateOrErr = validateReportDate(body?.date);
+  const reportDateOrErr = validateReportDate(input.date);
   if (typeof reportDateOrErr !== "string") {
     log("warn", "reports patch validation error", {
       requestId,
@@ -190,7 +205,7 @@ export async function patchAiComment(params: { userId: string; body: any; reques
   }
   const reportDate = reportDateOrErr;
 
-  const aiCommentOrErr = validateAiComment(body?.aiComment);
+  const aiCommentOrErr = validateAiComment(input.aiComment);
   if (typeof aiCommentOrErr !== "string") {
     log("warn", "reports patch validation error", {
       requestId,

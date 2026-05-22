@@ -15,7 +15,7 @@ export async function deleteAllReportsForUser(params: {
   const { userId, requestId } = params;
 
   const items: Array<{ userId: string; date: string }> = [];
-  let lastKey: Record<string, any> | undefined;
+  let lastKey: Record<string, unknown> | undefined;
 
   // 1) 全件取得（Projectionでキーだけに絞る）
   do {

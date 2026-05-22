@@ -4,6 +4,7 @@
 
 import { DeleteCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/lib/dynamodb";
+import type { GoalPlanDay } from "./normalize";
 
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 
@@ -14,7 +15,7 @@ export type GoalItem = {
   examDate: string | null;
   weeklyHours: number | null;
   weeksUntilExam: number | null;
-  plan: any[]; // TODO: 後で型を固める
+  plan: GoalPlanDay[];
   createdAt?: string;
   updatedAt?: string;
 };
@@ -74,7 +75,7 @@ export async function upsertGoalItem(item: GoalItem) {
  * plan だけ更新（他属性に触らない）
  * - postponePlanDay で使う
  */
-export async function updateGoalPlanOnly(params: { userId: string; plan: any[] }) {
+export async function updateGoalPlanOnly(params: { userId: string; plan: GoalPlanDay[] }) {
   const now = new Date().toISOString();
 
   const res = await ddb.send(

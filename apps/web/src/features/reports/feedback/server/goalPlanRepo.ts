@@ -11,6 +11,13 @@ type PlanDay = {
   tasks: string[];
 };
 
+type StoredPlanDay = {
+  date?: unknown;
+  theme?: unknown;
+  tasks?: unknown;
+  topics?: unknown;
+};
+
 const GOALS_TABLE = process.env.DDB_GOALS_TABLE || "StudyGoals";
 
 export async function findPlanDay(params: {
@@ -29,10 +36,10 @@ export async function findPlanDay(params: {
     }),
   );
 
-  const plan = (res.Item as any)?.plan;
+  const plan = res.Item?.plan;
   if (!Array.isArray(plan)) return null;
 
-  const day = plan.find((p: any) => p?.date === date);
+  const day = (plan as StoredPlanDay[]).find((p) => p?.date === date);
   if (!day) return null;
 
   const rawTasks = Array.isArray(day.tasks)
@@ -41,7 +48,7 @@ export async function findPlanDay(params: {
       ? day.topics
       : [];
 
-  const tasks = rawTasks.filter((t: any) => typeof t === "string");
+  const tasks = rawTasks.filter((t): t is string => typeof t === "string");
   const theme = typeof day.theme === "string" ? day.theme : undefined;
 
   log("info", "feedback plan found", {

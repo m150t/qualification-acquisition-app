@@ -101,7 +101,7 @@ export async function updateAiComment(
  */
 export async function deleteAllReports(userId: string) {
   const items: Array<{ userId: string; date: string }> = [];
-  let lastKey: Record<string, any> | undefined;
+  let lastKey: Record<string, unknown> | undefined;
 
   // 全件キー取得（ページング）
   do {
@@ -116,8 +116,17 @@ export async function deleteAllReports(userId: string) {
       }),
     );
 
-    if (res.Items) items.push(...(res.Items as any));
-    lastKey = res.LastEvaluatedKey;
+    if (res.Items) {
+      items.push(
+        ...res.Items
+          .map((item) => ({
+            userId: typeof item.userId === "string" ? item.userId : "",
+            date: typeof item.date === "string" ? item.date : "",
+          }))
+          .filter((item) => item.userId && item.date),
+      );
+    }
+    lastKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
   } while (lastKey);
 
   // 25件ずつ削除（UnprocessedItems リトライ最大5回）
@@ -133,7 +142,7 @@ export async function deleteAllReports(userId: string) {
           RequestItems: { [REPORTS_TABLE]: unprocessed },
         }),
       );
-      unprocessed = (res.UnprocessedItems?.[REPORTS_TABLE] as any[]) ?? [];
+      unprocessed = (res.UnprocessedItems?.[REPORTS_TABLE] as typeof unprocessed | undefined) ?? [];
       attempts += 1;
     }
   }

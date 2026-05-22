@@ -96,9 +96,10 @@ export async function generatePlan(params: {
     });
 
     return { plan };
-  } catch (e: any) {
+  } catch (e: unknown) {
     // timeout（Abort）は warning で返す：UX優先
-    if (String(e?.name ?? "").includes("Abort") || String(e?.message ?? "").toLowerCase().includes("aborted")) {
+    const errorLike = e as { name?: unknown; message?: unknown };
+    if (String(errorLike.name ?? "").includes("Abort") || String(errorLike.message ?? "").toLowerCase().includes("aborted")) {
       log("warn", "plan generate timeout", {
         requestId,
         userIdHash: hash8(userId),

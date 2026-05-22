@@ -8,6 +8,15 @@ import { CertificationDto } from "./dto";
 
 const CERTIFICATIONS_TABLE = process.env.DDB_CERTIFICATIONS_TABLE || "Certifications";
 
+type CertificationRecord = {
+  code?: unknown;
+  name?: unknown;
+  provider?: unknown;
+  defaultWeeklyHours?: unknown;
+  defaultWeeks?: unknown;
+  examGuide?: unknown;
+};
+
 export async function listCertifications(): Promise<CertificationDto[]> {
   const items: CertificationDto[] = [];
   let lastEvaluatedKey: Record<string, unknown> | undefined;
@@ -29,20 +38,20 @@ export async function listCertifications(): Promise<CertificationDto[]> {
       }),
     );
 
-    for (const it of res.Items ?? []) {
-      const code = (it as any)?.code;
-      const name = (it as any)?.name;
+    for (const it of (res.Items ?? []) as CertificationRecord[]) {
+      const code = it.code;
+      const name = it.name;
       if (typeof code === "string" && typeof name === "string") {
-        const provider = typeof (it as any)?.provider === "string" ? (it as any).provider : undefined;
+        const provider = typeof it.provider === "string" ? it.provider : undefined;
         const defaultWeeklyHours =
-          typeof (it as any)?.defaultWeeklyHours === "number" ? (it as any).defaultWeeklyHours : undefined;
-        const defaultWeeks = typeof (it as any)?.defaultWeeks === "number" ? (it as any).defaultWeeks : undefined;
-        const examGuide = (it as any)?.examGuide;
+          typeof it.defaultWeeklyHours === "number" ? it.defaultWeeklyHours : undefined;
+        const defaultWeeks = typeof it.defaultWeeks === "number" ? it.defaultWeeks : undefined;
+        const examGuide = it.examGuide;
 
         items.push({ code, name, provider, defaultWeeklyHours, defaultWeeks, examGuide });
       }
     }
-    lastEvaluatedKey = res.LastEvaluatedKey as any;
+    lastEvaluatedKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
   } while (lastEvaluatedKey);
 
   items.sort((a, b) => a.name.localeCompare(b.name, "ja"));
