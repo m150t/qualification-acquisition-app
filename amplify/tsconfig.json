@@ -8,6 +8,8 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
+    "typeRoots": ["../apps/web/node_modules/@types"],
+    "types": ["node"],
     "paths": {
       "$amplify/*": [
         "../.amplify/generated/*"

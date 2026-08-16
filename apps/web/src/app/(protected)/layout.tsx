@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession, signOut, deleteUser } from "aws-amplify/auth";
 import { getAuthHeaders } from "@/lib/authClient";
+import NotificationSettings from "@/features/notifications/NotificationSettings";
 
 export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -71,6 +72,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         </span>
 
         <div style={{ display: "flex", gap: 8 }}>
+          <NotificationSettings />
           <button
             onClick={handleDeleteAccount}
             disabled={deleting}

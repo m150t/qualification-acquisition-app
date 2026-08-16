@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://qua-log.com"),
   title: "QUALog｜資格学習を続けるためのアプリ",
   description: "学習計画が崩れても、戻れる。資格学習の継続を支えるアプリ。",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "QUALog", statusBarStyle: "default" },
   other: {
     "google-adsense-account": "ca-pub-3961829109868432",
   },
